@@ -1,0 +1,31 @@
+{
+  "name": "speed-quiz",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:server": "pnpm --filter @sq/server dev",
+    "dev:web": "pnpm --filter @sq/web dev",
+    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm typecheck && pnpm --filter @sq/web build && node scripts/build-server.mjs && node scripts/assemble.mjs",
+    "start": "node --disable-warning=ExperimentalWarning dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test --trace off",
+    "loadtest": "tsx tools/loadtest.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22.15.0",
+    "esbuild": "^0.25.12",
+    "socket.io-client": "^4.8.1",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
