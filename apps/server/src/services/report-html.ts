@@ -182,7 +182,7 @@ tr.win td{background:#fffaf0}
 .ch.ok .tx>span{color:var(--success)}
 .empty{color:var(--n-500);font-weight:700;text-align:center;padding:26px 0}
 footer{margin-top:40px;text-align:center;color:var(--n-500);font-size:13px;font-weight:600}
-@media(max-width:720px){.grid4{grid-template-columns:repeat(2,1fr)}.insights{grid-template-columns:1fr}.podium{grid-template-columns:1fr}
+@media(max-width:720px){header.hero::before{width:150px;height:150px;right:-50px;top:-60px}header.hero::after{display:none}.grid4{grid-template-columns:repeat(2,1fr)}.insights{grid-template-columns:1fr}.podium{grid-template-columns:1fr}
 .pod.p1,.pod.p2,.pod{padding-top:18px;padding-bottom:18px}.q{grid-template-columns:1fr}.q .ring{width:60px;height:60px}
 .hide-s{display:none}.card{padding:16px}th,td{padding-left:6px;padding-right:6px}}
 @media print{body{background:#fff}.wrap{max-width:none;padding:0}header.hero{padding:26px 0 56px}main{margin-top:-36px}
