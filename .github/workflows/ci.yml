@@ -1,9 +1,8 @@
 name: CI
 
+# Manual runs only (Actions tab → CI → "Run workflow", pick a branch). No automatic runs on push or PR.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   build-test:
