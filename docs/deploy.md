@@ -114,26 +114,26 @@ IIS를 쓴다면 ARR + URL Rewrite에 **WebSocket 프로토콜** 기능을 켜�
 방이 종료될 때와 매일 한 번 `data/backups/`에 DB 스냅샷이 생성되며 최근 14개를 보관합니다.
 복원은 서버를 멈춘 뒤 원하는 백업 파일을 `data/speed-quiz.db`로 복사하면 됩니다.
 
-## GitHub Actions 자동 배포 (SSH + pm2)
+## GitHub Actions 배포 (self-hosted runner + pm2)
 
-`main`에 push 되면 `.github/workflows/deploy.yml`이 서버에 SSH로 접속해 `scripts/deploy.sh`를 실행합니다
-(`git pull --ff-only` → `pnpm install --frozen-lockfile` → `pnpm build` → `pm2 restart` → `/api/health` 확인).
+서버에 설치한 self-hosted runner가 `.github/workflows/deploy.yml`을 실행합니다. **수동 실행 전용**입니다
+(Actions 탭 → Deploy → Run workflow). 동작은 `scripts/deploy.sh`: `git pull --ff-only` →
+`pnpm install --frozen-lockfile` → `pnpm build` → `pm2 restart` → `/api/health` 확인.
 
-**서버 사전 조건**: `~/speed-quiz`가 이 저장소의 git clone이고 `origin`으로 pull 가능해야 하며(private이면 deploy key/토큰),
-Node 22.13+, pnpm, pm2가 설치되어 있어야 합니다.
+러너는 서버에서 GitHub로 나가는 연결(아웃바운드 443)만 사용하므로 인바운드 포트 개방과 SSH 시크릿이 필요 없습니다.
 
-**GitHub 설정** (Settings → Secrets and variables → Actions)
+**서버 사전 조건**
+- 러너를 `~/speed-quiz`와 pm2를 소유한 **같은 계정**으로 설치·서비스 등록 (다른 계정이면 다른 pm2 데몬을 보게 됨)
+- `~/speed-quiz`는 이 저장소의 git clone (`git pull` 가능해야 함), Node 22.13+, pnpm, pm2 설치
+- RHEL 계열에서 서비스가 `status=203/EXEC`로 실패하면 SELinux 라벨 문제:
+  `sudo chcon -t bin_t <러너폴더>/runsvc.sh` (영구 적용은 `semanage fcontext` + `restorecon`)
 
-| 종류 | 이름 | 값 |
+**선택 설정** (Settings → Secrets and variables → Actions → Variables)
+
+| 이름 | 기본값 | 설명 |
 |---|---|---|
-| Secret | `SSH_HOST` | 서버 IP |
-| Secret | `SSH_USER` | SSH 로그인 ID |
-| Secret | `SSH_PRIVATE_KEY` | pem 파일 **전체 내용** (`-----BEGIN ...` ~ `END ...` 포함) |
-| Secret | `SSH_PORT` | (선택) 기본 22 |
-| Secret | `SSH_KNOWN_HOSTS` | (권장) `ssh-keyscan -p 22 <IP>` 출력값. 없으면 워크플로가 keyscan으로 대체 |
-| Variable | `PM2_APP` | (선택) `pm2 ls`의 name. 기본 `speed-quiz` |
+| `PM2_APP` | `speed-quiz` | `pm2 ls`의 name |
+| `APP_DIR` | `~/speed-quiz` | 서비스 폴더 절대 경로 |
 
-**방화벽**: GitHub-hosted runner는 IP 대역이 넓고 수시로 바뀌어 IP 허용 목록을 만들기 어렵습니다.
-인바운드 TCP 22(또는 SSH_PORT)를 열고 키 인증만 허용(`PasswordAuthentication no`)하는 방식을 권장합니다.
-서버가 사내망 전용이면 서버에 [self-hosted runner](https://docs.github.com/actions/hosting-your-own-runners)를 설치하고
-워크플로의 `runs-on`을 `self-hosted`로 바꾸세요(아웃바운드 443만 필요, 인바운드 개방 불필요).
+**보안**: 저장소 쓰기 권한이 있는 사람은 서버에서 코드를 실행할 수 있습니다. `pull_request` 등 자동 트리거를
+추가하지 말고(특히 public 저장소), `main` 브랜치 보호를 켜 두세요.
