@@ -1,0 +1,55 @@
+name: Deploy
+
+# main 브랜치에 push 되면 리눅스 서버에 자동 배포. Actions 탭에서 수동 실행도 가능.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 동시에 두 번 배포되지 않도록 직렬화 (진행 중인 배포는 취소하지 않음)
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest   # 서버가 사내망 전용이면 self-hosted 로 변경 (docs/deploy.md 참고)
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "::warning::SSH_KNOWN_HOSTS 시크릿이 없어 ssh-keyscan 으로 대체합니다 (호스트 키 검증 약함)"
+            ssh-keyscan -p "${SSH_PORT:-22}" -T 10 "$SSH_HOST" > ~/.ssh/known_hosts
+          fi
+
+      - name: Deploy over SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          PM2_APP: ${{ vars.PM2_APP }}
+        run: |
+          ssh -i ~/.ssh/id_deploy -p "${SSH_PORT:-22}" \
+              -o IdentitiesOnly=yes -o ServerAliveInterval=30 \
+              "$SSH_USER@$SSH_HOST" \
+              "PM2_APP='${PM2_APP:-speed-quiz}' BRANCH='main' bash -s" < scripts/deploy.sh
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/id_deploy
