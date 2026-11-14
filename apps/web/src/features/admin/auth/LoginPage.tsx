@@ -1,17 +1,14 @@
 import { useState } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { m } from 'motion/react';
 import { LogIn } from 'lucide-react';
 import { LoginInput } from '@sq/shared';
 import { errorText, post } from '@/lib/api';
-import { screenVariants } from '@/design/motion';
 import { useDocumentTitle } from '@/hooks/dom';
 import { Button } from '@/ui/Button';
-import { Logo } from '@/ui/display';
 import { TextField } from '@/ui/fields';
-import { ShapeDrift } from '@/game/effects';
-import { meKey, useMe } from '../session';
+import { meKey, useMe, useSignupEnabled } from '../session';
+import { AuthShell } from './AuthShell';
 
 function safeNext(next: string | null): string {
   if (next && next.startsWith('/admin') && !next.startsWith('//')) return next;
@@ -25,6 +22,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const me = useMe();
+  const signup = useSignupEnabled();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -52,46 +50,48 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-spark-400 px-4 py-10">
-      <ShapeDrift />
-      <m.div
-        variants={screenVariants}
-        initial="initial"
-        animate="animate"
-        className="relative w-full max-w-[400px] rounded-xl bg-surface p-7 shadow-lg md:p-8"
-      >
-        <div className="mb-6 flex flex-col items-center gap-2 text-center">
-          <Logo className="text-2xl" />
-          <p className="font-semibold text-fg-muted">관리자 화면에 로그인해 주세요</p>
-        </div>
-        <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-          <TextField
-            label="아이디"
-            autoComplete="username"
-            autoCapitalize="none"
-            autoFocus
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <TextField
-            label="비밀번호"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            error={error}
-          />
-          <Button type="submit" variant="ink" size="lg" block loading={busy} icon={<LogIn className="size-5" />}>
-            로그인
-          </Button>
-        </form>
-        <p className="mt-6 text-center text-sm text-fg-muted">
-          참여자이신가요?{' '}
-          <a href="/join" className="font-bold text-info underline-offset-2 hover:underline">
-            퀴즈 참여하기
-          </a>
-        </p>
-      </m.div>
-    </div>
+    <AuthShell
+      subtitle="관리자 화면에 로그인해 주세요"
+      footer={
+        <>
+          {signup.data?.enabled && (
+            <p>
+              계정이 없으신가요?{' '}
+              <Link to="/admin/signup" className="font-bold text-info underline-offset-2 hover:underline">
+                가입하기
+              </Link>
+            </p>
+          )}
+          <p>
+            참여자이신가요?{' '}
+            <a href="/join" className="font-bold text-info underline-offset-2 hover:underline">
+              퀴즈 참여하기
+            </a>
+          </p>
+        </>
+      }
+    >
+      <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
+        <TextField
+          label="아이디"
+          autoComplete="username"
+          autoCapitalize="none"
+          autoFocus
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+        />
+        <TextField
+          label="비밀번호"
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={error}
+        />
+        <Button type="submit" variant="ink" size="lg" block loading={busy} icon={<LogIn className="size-5" />}>
+          로그인
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

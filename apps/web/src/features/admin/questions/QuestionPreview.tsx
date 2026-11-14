@@ -94,12 +94,20 @@ export function StagePreview({ q }: { q: PreviewQuestion }) {
             {q.timeLimitSec ?? 20}
           </span>
         </div>
-        <div className="flex max-h-[45%] min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl bg-surface px-16 py-10 shadow-md">
-          {q.body.trim() || q.imageUrl ? (
-            <QuestionBody kind={q.kind} body={q.body} imageUrl={q.imageUrl} variant="stage" className="w-full" />
-          ) : (
-            <p className="text-[3rem] font-bold text-n-300">문제 내용이 여기에 보여요</p>
-          )}
+        {/* Long bodies scroll (mouse wheel) instead of being clipped, like the real presenter screen.
+            my-auto keeps short bodies centred while long ones start at the top. */}
+        <div
+          className="fade-mask-y flex max-h-[45%] min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain rounded-2xl bg-surface px-16 py-10 shadow-md"
+          tabIndex={0}
+          aria-label="문제 내용 (스크롤 가능)"
+        >
+          <div className="my-auto flex w-full justify-center">
+            {q.body.trim() || q.imageUrl ? (
+              <QuestionBody kind={q.kind} body={q.body} imageUrl={q.imageUrl} variant="stage" className="w-full" />
+            ) : (
+              <p className="text-[3rem] font-bold text-n-300">문제 내용이 여기에 보여요</p>
+            )}
+          </div>
         </div>
         <div className="grid flex-1 grid-cols-6 gap-6">
           {texts.map((t, i) => (

@@ -14,6 +14,14 @@
 .q-body > * + * {
   margin-top: 0.5em;
 }
+.q-body h1 {
+  font-size: 1.35em;
+  font-weight: 900;
+}
+.q-body h2 {
+  font-size: 1.28em;
+  font-weight: 850;
+}
 .q-body h3 {
   font-size: 1.2em;
   font-weight: 800;
@@ -99,4 +107,26 @@
 }
 .q-body rt {
   font-size: 0.55em;
+}
+.q-body caption,
+.q-body figcaption {
+  font-size: 0.8em;
+  font-weight: 500;
+  color: var(--fg-muted);
+  padding: 0.25em 0;
+}
+.q-body figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3em;
+}
+.q-body dl {
+  text-align: left;
+}
+.q-body dt {
+  font-weight: 800;
+}
+.q-body dd {
+  padding-left: 1.2em;
 }

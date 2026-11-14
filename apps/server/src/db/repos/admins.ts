@@ -31,6 +31,17 @@ export const adminsRepo = {
   byUsername(db: Db, username: string): AdminRow | undefined {
     return db.get<AdminRow>('SELECT * FROM admins WHERE username = ?', username);
   },
+  /** Case-insensitive nickname lookup (nicknames are unique across admins). */
+  byDisplayName(db: Db, displayName: string, excludeId?: number): AdminRow | undefined {
+    return db.get<AdminRow>(
+      'SELECT * FROM admins WHERE display_name = ? COLLATE NOCASE AND id <> ?',
+      displayName.trim(),
+      excludeId ?? -1,
+    );
+  },
+  countActiveMain(db: Db): number {
+    return db.get<{ n: number }>("SELECT COUNT(*) AS n FROM admins WHERE role = 'MAIN' AND disabled = 0")!.n;
+  },
   byId(db: Db, id: number): AdminRow | undefined {
     return db.get<AdminRow>('SELECT * FROM admins WHERE id = ?', id);
   },
@@ -50,9 +61,10 @@ export const adminsRepo = {
   setPassword(db: Db, id: number, hash: string): void {
     db.run('UPDATE admins SET password_hash = ? WHERE id = ?', hash, id);
   },
-  update(db: Db, id: number, patch: { displayName?: string; disabled?: boolean }): void {
+  update(db: Db, id: number, patch: { displayName?: string; disabled?: boolean; role?: AdminRole }): void {
     if (patch.displayName !== undefined) db.run('UPDATE admins SET display_name = ? WHERE id = ?', patch.displayName, id);
     if (patch.disabled !== undefined) db.run('UPDATE admins SET disabled = ? WHERE id = ?', patch.disabled ? 1 : 0, id);
+    if (patch.role !== undefined) db.run('UPDATE admins SET role = ? WHERE id = ?', patch.role, id);
   },
   touchLogin(db: Db, id: number): void {
     db.run('UPDATE admins SET last_login_at = ? WHERE id = ?', Date.now(), id);

@@ -171,6 +171,32 @@ test('hostile HTML in a question never executes', async ({ browser }) => {
   s.close();
 });
 
+test('a long question scrolls on the presenter screen instead of being clipped', async ({ browser }) => {
+  const { ctx: admin, cookie } = await adminContext(browser);
+  const lines = Array.from({ length: 16 }, (_, i) => `<p>${i + 1}번째 줄: 긴 문제도 발표 화면에서 끝까지 읽을 수 있어야 해요.</p>`).join('');
+  const { roomId } = await setupRoom(admin, { title: '긴 문제', html: `${lines}<p>마지막줄입니다</p>` });
+  const presenter = await admin.newPage();
+  await presenter.setViewportSize({ width: 1920, height: 1080 });
+  await presenter.goto(`/screen/${roomId}`);
+  await presenter.getByRole('button', { name: '시작하기' }).click(); // sound/fullscreen gate
+  // headless Chromium does not deliver wheel scrolling to fullscreen documents; real browsers do
+  await presenter.waitForFunction(() => !!document.fullscreenElement, null, { timeout: 3000 }).catch(() => {});
+  await presenter.evaluate(() => document.fullscreenElement && document.exitFullscreen());
+  const { s, control } = await adminSocket(cookie, roomId);
+  await control({ type: 'START_QUESTION', index: 0 });
+  await expect(presenter.getByText('도전').first()).toBeVisible({ timeout: 10_000 }); // past the ready countdown
+  const last = presenter.getByText('마지막줄입니다');
+  await expect(last).not.toBeInViewport();
+  const scroller = presenter.locator('.q-body').first().locator('xpath=ancestor::div[contains(@class,"overflow-y-auto")][1]');
+  const dims = await scroller.evaluate((el) => ({ sh: el.scrollHeight, ch: el.clientHeight }));
+  expect(dims.sh, 'long body overflows its card').toBeGreaterThan(dims.ch);
+  await scroller.hover();
+  await presenter.mouse.wheel(0, 4000);
+  await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  await expect(last).toBeInViewport();
+  s.close();
+});
+
 test('wrong room code shows an inline error', async ({ page }) => {
   await page.goto('/join');
   await page.getByLabel('방 코드 6자리').fill('000000');
