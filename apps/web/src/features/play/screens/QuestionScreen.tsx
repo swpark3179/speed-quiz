@@ -104,7 +104,7 @@ export function QuestionScreen({
         )}
       </div>
 
-      <div className="relative min-h-0 flex-1">
+      <div className="@container relative min-h-0 flex-1">
         <AnimatePresence mode="popLayout" initial={false}>
           {showLocked && chosen ? (
             <LockedCard key="locked" state={state} choicePosition={chosen.position} text={chosen.text} status={answer!.status} />
@@ -130,7 +130,15 @@ export function QuestionScreen({
                     }
                     transition={{ ...spring.pop, delay: i * stagger.tiles }}
                   >
-                    <ChoiceButton position={c.position} text={c.text} state={st} onSelect={() => select(c.id)} kbdHint className="h-full" />
+                    <ChoiceButton
+                      position={c.position}
+                      text={c.text}
+                      state={st}
+                      onSelect={() => select(c.id)}
+                      kbdHint
+                      row={long}
+                      className="h-full"
+                    />
                   </m.div>
                 );
               })}

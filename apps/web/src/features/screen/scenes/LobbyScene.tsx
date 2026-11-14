@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { m } from 'motion/react';
+import { m, useReducedMotion } from 'motion/react';
 import { Users } from 'lucide-react';
 import type { GameState } from '@/stores/game.reducer';
 import { AvatarCloud } from '@/game/AvatarCloud';
@@ -16,6 +16,7 @@ export function LobbyScene({ state }: { state: GameState }) {
   const remPx = useRemPx();
   const bump = useBumpKey(state.rosterCount);
   const lastPop = useRef(0);
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     if (bump === 0) return;
@@ -61,8 +62,8 @@ export function LobbyScene({ state }: { state: GameState }) {
               <div className="flex h-full flex-col items-center justify-center gap-4 text-fg-muted">
                 <m.p
                   className="font-display text-[3rem]"
-                  animate={{ opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 2.4, repeat: Infinity }}
+                  animate={reduce ? { opacity: 1 } : { opacity: [0.5, 1, 0.5] }}
+                  transition={reduce ? { duration: 0 } : { duration: 2.4, repeat: Infinity }}
                 >
                   참가자를 기다리고 있어요
                 </m.p>

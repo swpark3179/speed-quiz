@@ -1,3 +1,4 @@
+import '../zod-ko';
 import { z } from 'zod';
 import { HTML_BODY_MAX, UPLOAD_URL_RE } from '../sanitize-policy';
 

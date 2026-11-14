@@ -111,6 +111,8 @@ interface RoomRow {
 const ROSTER_FLUSH_MS = 500;
 const PROGRESS_FLUSH_MS = 250;
 const ROSTER_SNAPSHOT_MAX = 300;
+/** A dropped connection (reload, Wi-Fi blip) gets this long to come back before it can trigger auto-close. */
+const DISCONNECT_AUTOCLOSE_GRACE_MS = 3000;
 
 export class RoomEngine {
   readonly id: number;
@@ -135,6 +137,7 @@ export class RoomEngine {
   private timer: unknown = null;
   private rosterTimer: unknown = null;
   private progressTimer: unknown = null;
+  private autoCloseTimer: unknown = null;
   private rosterAdded: RosterEntry[] = [];
   private rosterRemoved: number[] = [];
   private rosterDirty = false;
@@ -318,8 +321,8 @@ export class RoomEngine {
 
   dispose(): void {
     this.disposed = true;
-    for (const t of [this.timer, this.rosterTimer, this.progressTimer]) if (t) this.deps.scheduler.clear(t);
-    this.timer = this.rosterTimer = this.progressTimer = null;
+    for (const t of [this.timer, this.rosterTimer, this.progressTimer, this.autoCloseTimer]) if (t) this.deps.scheduler.clear(t);
+    this.timer = this.rosterTimer = this.progressTimer = this.autoCloseTimer = null;
   }
 
   /* ------------------------------------------------------------------ */
@@ -559,9 +562,17 @@ export class RoomEngine {
       this.scheduleRoster();
       if (this.phase === 'QUESTION_ACTIVE') {
         this.scheduleProgress();
-        this.maybeAutoClose();
+        this.scheduleAutoCloseCheck();
       }
     }
+  }
+
+  private scheduleAutoCloseCheck(): void {
+    if (this.autoCloseTimer || this.disposed) return;
+    this.autoCloseTimer = this.deps.scheduler.set(() => {
+      this.autoCloseTimer = null;
+      this.maybeAutoClose();
+    }, DISCONNECT_AUTOCLOSE_GRACE_MS);
   }
 
   kick(pid: number): void {

@@ -31,7 +31,7 @@ export function ParticipantsPanel({ snap, onKick }: { snap: AdminSnapshot; onKic
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-surface text-left text-xs font-bold text-fg-muted">
               <tr>
-                <th className="w-10 py-2 pl-5 text-center">순위</th>
+                <th className="w-14 py-2 pl-4 text-center whitespace-nowrap">순위</th>
                 <th className="py-2 pl-2">닉네임</th>
                 {active && <th className="w-12 py-2 text-center">응답</th>}
                 <th className="w-20 py-2 pr-2 text-right">점수</th>
@@ -41,7 +41,7 @@ export function ParticipantsPanel({ snap, onKick }: { snap: AdminSnapshot; onKic
             <tbody>
               {list.map((p) => (
                 <tr key={p.id} className="border-t border-line/60">
-                  <td className="tabular py-2 pl-5 text-center font-black text-fg-muted">{p.rank || '-'}</td>
+                  <td className="tabular py-2 pl-4 text-center font-black text-fg-muted">{p.rank || '-'}</td>
                   <td className="py-2 pl-2">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="relative">

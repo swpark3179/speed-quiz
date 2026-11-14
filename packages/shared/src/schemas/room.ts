@@ -1,3 +1,4 @@
+import '../zod-ko';
 import { z } from 'zod';
 import { RoomSettings } from './settings';
 import type { QuestionKind } from './question';

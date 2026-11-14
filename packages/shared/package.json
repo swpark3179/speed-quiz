@@ -11,5 +11,8 @@
   },
   "dependencies": {
     "zod": "^4.1.0"
-  }
+  },
+  "sideEffects": [
+    "./src/zod-ko.ts"
+  ]
 }

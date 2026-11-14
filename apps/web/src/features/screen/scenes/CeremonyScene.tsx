@@ -12,7 +12,7 @@ import { num } from '@/lib/format';
 import { useRemPx } from '../hooks';
 import { PrizeCard, type WinnerInfo } from '../ceremony/PrizeCard';
 import { Flash, LightRays, Spotlight } from '../ceremony/fx';
-import { PODIUM_BLOCK, STAGE_H, STAGE_W, ceremonySlots, grandShift, medal, wallSlots, type Slot } from '../ceremony/layout';
+import { PODIUM_BLOCK, STAGE_H, STAGE_W, ceremonySlots, grandShift, grandSlotOf, medal, wallSlots, type Slot } from '../ceremony/layout';
 
 type StepPhase = 'build' | 'flipped' | 'done';
 interface Step {
@@ -113,7 +113,7 @@ export function CeremonyScene({ state }: { state: GameState }) {
               setStep({ rank: latest.rank, kind: latest.kind, phase: 'flipped', late });
               if (late) return;
               setFlashKey((k) => k + 1);
-              const slot = ceremonySlots(winnerCount).get(latest.rank);
+              const slot = ceremony.get(latest.rank);
               if (latest.kind === 'quick') {
                 sfx.cymbal();
               } else if (latest.kind === 'standard') {
@@ -155,21 +155,23 @@ export function CeremonyScene({ state }: { state: GameState }) {
   const activeStep = !ended && step && latest && step.rank === latest.rank ? step : null;
   const grandActive = activeStep?.kind === 'grand';
   const grandFlipped = grandActive && activeStep!.phase !== 'build';
-  const activeSlot = activeStep ? ceremony.get(activeStep.rank) : undefined;
-  const grandSlot = ceremony.get(1);
+  const baseGrand = ceremony.get(1);
+  const grandSlot = baseGrand ? grandSlotOf(baseGrand) : undefined;
 
-  const overlay = ended ? 0 : opening === 'none' ? 0 : grandActive ? (grandFlipped ? 0.4 : 0.85) : 0.72;
+  const overlay = ended ? 0 : opening === 'none' ? 0 : grandActive ? (grandFlipped ? 0.8 : 0.97) : 0.9;
   const lightOnText = !ended && opening !== 'none';
 
   const slotFor = (rank: number): Slot => {
     if (ended) return wall.slots.get(rank)!;
     const s = ceremony.get(rank)!;
-    if (grandActive && grandSlot && rank !== 1) {
-      const d = grandShift(s, grandSlot);
+    if (grandActive && baseGrand) {
+      if (rank === 1) return grandSlotOf(baseGrand);
+      const d = grandShift(s, baseGrand);
       return { ...s, x: s.x + d.dx, y: s.y + d.dy };
     }
     return s;
   };
+  const activeSlot = activeStep ? slotFor(activeStep.rank) : undefined;
 
   const ranks = Array.from({ length: winnerCount }, (_, i) => i + 1);
   const spotX = activeSlot ? activeSlot.x + activeSlot.w / 2 : STAGE_W / 2;
@@ -182,7 +184,8 @@ export function CeremonyScene({ state }: { state: GameState }) {
     <div ref={rootRef} className="absolute inset-0 overflow-hidden">
       {/* lights down */}
       <m.div
-        className="pointer-events-none absolute inset-0 bg-[#07051a]"
+        className="pointer-events-none absolute inset-0"
+        style={{ background: 'radial-gradient(ellipse at 50% 0%, #2A2566 0%, #110E2E 55%, #07051A 100%)' }}
         initial={false}
         animate={{ opacity: overlay }}
         transition={{ duration: 0.5 }}
@@ -208,7 +211,12 @@ export function CeremonyScene({ state }: { state: GameState }) {
             transition={spring.bouncy}
           >
             <PartyPopper className="size-[5rem] -scale-x-100 text-spark-600" aria-hidden="true" />
-            <h1 className="font-display text-[6rem] leading-none">축하합니다!</h1>
+            <div className="text-center">
+              <h1 className="font-display text-[6rem] leading-none">축하합니다!</h1>
+              <p className="mt-3 text-[1.9rem] font-bold text-fg-muted">
+                {state.room?.title} · 참여해 주셔서 감사합니다
+              </p>
+            </div>
             <PartyPopper className="size-[5rem] text-spark-600" aria-hidden="true" />
           </m.div>
         ) : (

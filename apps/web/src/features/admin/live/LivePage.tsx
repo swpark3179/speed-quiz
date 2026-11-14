@@ -89,10 +89,12 @@ export default function LivePage() {
       <main className="mx-auto grid max-w-[1600px] gap-5 px-4 py-5 md:px-6 lg:grid-cols-3 lg:gap-6">
         <section className="flex min-w-0 flex-col gap-5 lg:col-span-2">
           <QuestionPanel snap={snap} />
-          <div className="grid gap-5 md:grid-cols-2">
-            <ResponseMeter snap={snap} />
-            <RecentFeed snap={snap} showCorrect={showAnswerFeed} />
-          </div>
+          {(phase === 'LOBBY' || phase === 'QUESTION_ACTIVE' || phase === 'QUESTION_REVEAL' || phase === 'LEADERBOARD') && (
+            <div className="grid gap-5 md:grid-cols-2">
+              <ResponseMeter snap={snap} />
+              <RecentFeed snap={snap} showCorrect={showAnswerFeed} />
+            </div>
+          )}
           <PresenterPreview roomId={roomId} onOpen={openPresenter} />
         </section>
         <aside className="flex min-w-0 flex-col gap-5">

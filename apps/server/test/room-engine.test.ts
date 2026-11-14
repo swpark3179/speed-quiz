@@ -166,6 +166,9 @@ describe('RoomEngine', () => {
     engine.submitAnswer(a!, c.rqId, c.correct);
     expect(engine.phase).toBe('QUESTION_ACTIVE');
     engine.disconnect(b!);
+    // a dropped phone gets a short grace period to reconnect before it can trigger auto-close
+    expect(engine.phase).toBe('QUESTION_ACTIVE');
+    w.scheduler.advance(3100);
     expect(engine.phase).toBe('QUESTION_REVEAL');
     engine.kick(b!);
     expect(w.bus.disconnected).toContain(b);
@@ -209,6 +212,23 @@ describe('RoomEngine', () => {
     expect(again.playSnapshot(a!).me.score).toBe(1000);
     w.db.close();
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a reconnect within the grace period prevents a premature auto-close', () => {
+    const w = setupWorld();
+    const q = makeQuestion(w);
+    const { engine } = makeRoom(w, [q.id]);
+    const [a, b] = join(w, engine, ['A', 'B']);
+    openQuestion(w, engine, 0);
+    const c = correctChoice(engine, 0);
+    engine.submitAnswer(a!, c.rqId, c.correct);
+    engine.disconnect(b!); // e.g. page reload
+    w.scheduler.advance(1000);
+    engine.connect(b!);
+    w.scheduler.advance(3000);
+    expect(engine.phase).toBe('QUESTION_ACTIVE');
+    engine.submitAnswer(b!, c.rqId, c.wrong);
+    expect(engine.phase).toBe('QUESTION_REVEAL');
   });
 
   it('reset wipes participants and returns to lobby', () => {

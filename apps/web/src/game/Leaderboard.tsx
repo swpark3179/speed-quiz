@@ -80,8 +80,8 @@ export function StageLeaderboard({ entries, at, eventKey }: { entries: Leaderboa
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...spring.layout, visualDuration: 0.6, delay: stage === 'prev' ? cappedStagger(i, 0.04) : 0 }}
             className={cn(
-              'relative flex h-[5rem] items-center gap-5 overflow-hidden rounded-lg bg-surface px-6 shadow-sm ring-1 ring-line/60',
-              stage === 'final' && e.rank === 1 && 'bg-spark-400 text-ink ring-spark-600',
+              'relative flex h-[5rem] items-center gap-5 overflow-hidden rounded-lg px-6 shadow-sm ring-1',
+              stage === 'final' && e.rank === 1 ? 'bg-spark-400 text-ink ring-spark-600' : 'bg-surface ring-line/60',
             )}
           >
             {moved > 0 && (

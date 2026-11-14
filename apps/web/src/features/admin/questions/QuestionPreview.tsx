@@ -40,7 +40,7 @@ function Scaled({ width, height, children, className }: { width: number; height:
 const phoneOnly = (cls: string) =>
   cls
     .split(/\s+/)
-    .filter((c) => !/^(sm|md|lg|xl|2xl):/.test(c))
+    .filter((c) => !/^@?(sm|md|lg|xl|[2-7]xl):/.test(c))
     .join(' ');
 
 export function PhonePreview({ q }: { q: PreviewQuestion }) {
@@ -66,7 +66,7 @@ export function PhonePreview({ q }: { q: PreviewQuestion }) {
           </div>
           <div className={cn('grid min-h-0 flex-1 gap-2.5 p-4', phoneOnly(phoneGridClass(texts.length, long)), long && 'overflow-hidden')}>
             {texts.map((t, i) => (
-              <ChoiceButton key={i} position={i} text={t} state="idle" tabIndex={-1} className={phoneOnly(phoneItemClass(texts.length, i, long))} />
+              <ChoiceButton key={i} position={i} text={t} state="idle" tabIndex={-1} row={long} className={phoneOnly(phoneItemClass(texts.length, i, long))} />
             ))}
           </div>
         </div>

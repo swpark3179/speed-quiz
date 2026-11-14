@@ -1,3 +1,4 @@
+import '../zod-ko';
 import { z } from 'zod';
 
 const pts = z.number().int().min(0).max(10_000);

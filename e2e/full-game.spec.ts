@@ -91,7 +91,8 @@ test('full game: phones join, answer, see results and the ceremony; presenter fo
   await presenter.setViewportSize({ width: 1920, height: 1080 });
   presenter.on('request', (r) => !r.url().startsWith(BASE) && !r.url().startsWith('data:') && !r.url().startsWith('blob:') && external.push(r.url()));
   await presenter.goto(`/screen/${roomId}`);
-  await expect(presenter.getByText(code).first()).toBeVisible();
+  // the presenter shows the code in two groups ("311 374")
+  await expect(presenter.getByText(new RegExp(`${code.slice(0, 3)}\\s?${code.slice(3)}`)).first()).toBeVisible();
 
   const phones = [
     await joinPhone(browser, 'Pixel 7', code, '가나다'),
@@ -106,14 +107,14 @@ test('full game: phones join, answer, see results and the ceremony; presenter fo
   // Q1 — phone 0 correct (1st), phone 1 wrong, phone 2 reloads mid-question then answers correct
   await control({ type: 'START_QUESTION', index: 0 });
   await answer(phones[0]!, /1번 동그라미/);
-  await expect(phones[0]!.getByText('제출 완료!')).toBeVisible();
+  await expect(phones[0]!.getByText('제출 완료!', { exact: true })).toBeVisible();
   await answer(phones[1]!, /2번 세모/);
 
   await phones[2]!.reload();
   await answer(phones[2]!, /1번 동그라미/);
   // all answered → auto close → reveal
-  await expect(phones[0]!.getByText('정답!')).toBeVisible({ timeout: 10_000 });
-  await expect(phones[1]!.getByText('땡!')).toBeVisible();
+  await expect(phones[0]!.getByText('정답!', { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(phones[1]!.getByText('땡!', { exact: true })).toBeVisible();
   await expect(phones[0]!.getByText('+1,000')).toBeVisible();
 
   // Reload after answering keeps identity (no re-join)
@@ -126,14 +127,14 @@ test('full game: phones join, answer, see results and the ceremony; presenter fo
   // Q2 — everyone answers correctly
   await control({ type: 'START_QUESTION', index: 1 });
   for (const p of phones) await answer(p, /1번 동그라미/);
-  await expect(phones[2]!.getByText('정답!')).toBeVisible({ timeout: 10_000 });
+  await expect(phones[2]!.getByText('정답!', { exact: true })).toBeVisible({ timeout: 10_000 });
 
   const fin = await control({ type: 'FINISH' });
   expect(fin.winners.map((w) => w.rank)).toEqual([1, 2]);
   await expect(phones[0]!.getByText('결과 발표 중')).toBeVisible();
   await control({ type: 'REVEAL_PRIZE', rank: 2 });
   await control({ type: 'REVEAL_PRIZE', rank: 1 });
-  await expect(phones[0]!.getByText('1등 수상!')).toBeVisible({ timeout: 15_000 });
+  await expect(phones[0]!.getByText('1등 수상!', { exact: true })).toBeVisible({ timeout: 15_000 });
   await control({ type: 'END' });
   await expect(phones[1]!.getByText('최종 순위')).toBeVisible({ timeout: 10_000 });
 

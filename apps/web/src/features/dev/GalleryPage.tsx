@@ -99,11 +99,11 @@ export default function GalleryPage() {
             return (
               <div key={n} className="flex flex-col items-center gap-2">
                 <span className="font-bold text-fg-muted">{n}개</span>
-                <div className="h-[460px] w-[260px] rounded-[2rem] border-8 border-ink bg-bg p-2">
+                <div className="h-[720px] w-[390px] rounded-[2.5rem] border-8 border-ink bg-bg p-3" style={{ zoom: 0.62 }}>
                   <div className={cn('grid h-full gap-2 overflow-y-auto', phoneGridClass(n, isLong))}>
                     {t.map((text, i) => (
                       <div key={i} className={cn('flex min-h-0', phoneItemClass(n, i, isLong))}>
-                        <ChoiceButton position={i} text={text} state={i === 1 ? 'selected' : 'idle'} className="h-full" />
+                        <ChoiceButton position={i} text={text} state={i === 1 ? 'selected' : 'idle'} row={isLong} className="h-full" />
                       </div>
                     ))}
                   </div>

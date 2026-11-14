@@ -15,27 +15,34 @@ export function choiceFontPx(text: string): number {
   return 16;
 }
 
+/** Switch to the one-column list when text would not fit a tile (smaller tiles with 5–6 choices). */
 export function isLongChoiceSet(texts: string[]): boolean {
-  return texts.some((t) => [...t].length > 40);
+  const limit = texts.length >= 5 ? 22 : 40;
+  return texts.some((t) => [...t].length > limit);
 }
 
-/** Grid placement for 2–6 choices on phones/PC. Red/green and blue/violet sit on diagonals. */
+/**
+ * Grid placement for 2–6 choices. Red/green and blue/violet sit on diagonals.
+ * Uses container queries (the parent must be `@container`), so editor previews and the dev gallery
+ * lay out exactly like a phone of the same width.
+ */
 export function phoneGridClass(count: number, long: boolean): string {
-  if (long) return 'grid-cols-1 auto-rows-[minmax(64px,1fr)]';
+  if (long) return 'grid-cols-1 auto-rows-[minmax(64px,auto)]'; // rows grow with text; grid scrolls if needed
   switch (count) {
     case 2:
-      return 'grid-cols-1 grid-rows-2 md:grid-cols-2 md:grid-rows-1';
+      return 'grid-cols-1 grid-rows-2 @3xl:grid-cols-2 @3xl:grid-rows-1';
     case 3:
     case 4:
       return 'grid-cols-2 grid-rows-2';
     default:
-      return 'grid-cols-2 grid-rows-3 lg:grid-cols-3 lg:grid-rows-2';
+      return 'grid-cols-2 grid-rows-3 @3xl:grid-cols-3 @3xl:grid-rows-2';
   }
 }
 
 export function phoneItemClass(count: number, index: number, long: boolean): string {
   if (long) return '';
-  if ((count === 3 && index === 2) || (count === 5 && index === 4)) return 'col-span-2 lg:col-span-1';
+  if (count === 3 && index === 2) return 'col-span-2';
+  if (count === 5 && index === 4) return 'col-span-2 @3xl:col-span-1';
   return '';
 }
 
@@ -53,10 +60,12 @@ interface ChoiceButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> 
   state: ChoiceState;
   onSelect?: () => void;
   kbdHint?: boolean;
+  /** one-column list layout for long texts: shape left, text left-aligned */
+  row?: boolean;
 }
 
 /** Big participant answer button ("arcade key" with colour + shape + number + text). */
-export function ChoiceButton({ position, text, state, onSelect, kbdHint, className, ...rest }: ChoiceButtonProps) {
+export function ChoiceButton({ position, text, state, onSelect, kbdHint, row, className, ...rest }: ChoiceButtonProps) {
   const meta = choiceMeta(position);
   const interactive = state === 'idle';
   const dim = state === 'dimmed' || state === 'other' || state === 'disabled';
@@ -84,23 +93,30 @@ export function ChoiceButton({ position, text, state, onSelect, kbdHint, classNa
     >
       <span
         className={cn(
-          'relative flex w-full flex-1 items-center justify-center rounded-lg px-4 pt-9 pb-5 text-center text-white transition-transform duration-75',
+          'relative flex w-full flex-1 items-center overflow-hidden rounded-lg text-white transition-transform duration-75',
+          row ? 'justify-start py-3 pr-12 pl-14 text-left' : 'justify-center px-4 pt-9 pb-5 text-center',
           interactive ? '-translate-y-1.5 group-active:-translate-y-0.5' : '-translate-y-0.5',
         )}
         style={{ background: meta.base }}
       >
-        <ChoiceShape shape={meta.shape} className="absolute top-3 left-3 size-7 drop-shadow-sm" />
+        <ChoiceShape
+          shape={meta.shape}
+          className={cn('absolute size-7 drop-shadow-sm', row ? 'top-1/2 left-4 -translate-y-1/2' : 'top-3 left-3')}
+        />
         <span
-          className="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full bg-white text-sm font-black"
+          className={cn(
+            'absolute flex size-7 items-center justify-center rounded-full bg-white text-sm font-black',
+            row ? 'top-1/2 right-3 -translate-y-1/2' : 'top-3 right-3',
+          )}
           style={{ color: meta.edge }}
           aria-hidden="true"
         >
           {meta.number}
         </span>
-        <span className="leading-snug font-bold [text-wrap:balance]" style={{ fontSize: choiceFontPx(text) }}>
+        <span className="leading-snug font-bold [text-wrap:balance]" style={{ fontSize: row ? ([...text].length > 30 ? 16 : 18) : choiceFontPx(text) }}>
           {text}
         </span>
-        {kbdHint && interactive && (
+        {kbdHint && interactive && !row && (
           <span className="absolute bottom-2 left-1/2 hidden -translate-x-1/2 text-xs font-bold text-white/70 pointer-fine:block">
             키보드 {meta.number}
           </span>

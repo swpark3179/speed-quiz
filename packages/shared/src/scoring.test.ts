@@ -25,7 +25,7 @@ describe('scorePoints', () => {
   });
 
   it('RANK_TABLE uses the table and 0 bonus beyond it', () => {
-    const cfg = { mode: 'RANK_TABLE', base: 100, table: [300, 200, 100] } as const;
+    const cfg = { mode: 'RANK_TABLE' as const, base: 100, table: [300, 200, 100] };
     expect([1, 2, 3, 4, 10].map((r) => scorePoints(cfg, { ...base, correctRank: r }))).toEqual([400, 300, 200, 100, 100]);
   });
 

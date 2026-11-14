@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { DropdownMenu } from 'radix-ui';
-import { Flag, Gift, ListOrdered, MonitorPlay, MoreHorizontal, OctagonX, Play, QrCode, RotateCcw, SkipForward, Square, Trophy } from 'lucide-react';
+import { BarChart3, Flag, Gift, ListOrdered, MonitorPlay, MoreHorizontal, OctagonX, Play, QrCode, RotateCcw, SkipForward, Square, Trophy } from 'lucide-react';
 import { CEREMONY_TIMING, type AdminSnapshot, type ControlCommand, type ControlType, type PrimaryAction } from '@sq/shared';
 import { Button } from '@/ui/Button';
 import { Kbd } from '@/ui/display';
@@ -114,7 +115,7 @@ export function ActionBar({
   return (
     <div className="fixed inset-x-0 bottom-0 z-(--z-sticky) border-t border-line bg-surface/95 pb-safe shadow-[0_-8px_24px_rgb(23_21_59/0.08)] backdrop-blur">
       <div className="mx-auto flex max-w-[1600px] flex-col-reverse items-stretch gap-3 px-4 pt-3 md:flex-row md:items-center md:px-6">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <Button variant="secondary" size="md" icon={<MonitorPlay className="size-5" />} onClick={onOpenPresenter}>
             <span className="hidden sm:inline">진행 화면 열기</span>
             <span className="sm:hidden">진행 화면</span>
@@ -127,11 +128,12 @@ export function ActionBar({
             disabled={!connected || snap.room.phase === 'ENDED'}
             onClick={() => send({ roomId, type: 'SCREEN_VIEW', view: qrOn ? 'AUTO' : 'JOIN_QR' })}
           >
-            {qrOn ? '입장 QR 끄기' : '입장 QR 띄우기'}
+            <span className="hidden sm:inline">{qrOn ? '입장 QR 끄기' : '입장 QR 띄우기'}</span>
+            <span className="sm:hidden">{qrOn ? 'QR 끄기' : 'QR'}</span>
           </Button>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <Button variant="ghost" size="md" icon={<MoreHorizontal className="size-5" />} aria-label="더 보기">
+              <Button variant="ghost" size="md" icon={<MoreHorizontal className="size-5" />} aria-label="더 보기" className="ml-auto md:ml-0">
                 <span className="hidden lg:inline">더 보기</span>
               </Button>
             </DropdownMenu.Trigger>
@@ -178,21 +180,32 @@ export function ActionBar({
           </DropdownMenu.Root>
         </div>
         <div className="flex items-center gap-3 md:ml-auto">
-          <span className="hidden items-center gap-1 text-sm text-fg-muted lg:flex">
+          <span className={cn('hidden items-center gap-1 text-sm text-fg-muted', snap.room.phase !== 'ENDED' && 'lg:flex')}>
             <Kbd>Space</Kbd> 다음 단계
           </span>
-          <Button
-            variant={primary?.type === 'END' ? 'ink' : primary?.type === 'CLOSE_QUESTION' ? 'danger' : 'primary'}
-            size="xl"
-            block
-            className="md:w-auto md:min-w-[22rem]"
-            loading={pending}
-            disabled={disabled}
-            onClick={() => void firePrimary()}
-            icon={ceremonyBusy ? <ProgressRing fraction={1 - busyLeft / busySpan} /> : <Icon className="size-6" />}
-          >
-            {primary ? (ceremonyBusy ? '공개 연출 중…' : primary.label) : snap.room.phase === 'ENDED' ? '퀴즈가 끝났어요' : '대기 중'}
-          </Button>
+          {snap.room.phase === 'ENDED' ? (
+            <Link
+              to={`/admin/rooms/${roomId}`}
+              className="group inline-flex w-full rounded-lg bg-spark-600 pt-1 md:w-auto md:min-w-[22rem]"
+            >
+              <span className="inline-flex h-16 w-full -translate-y-1.5 items-center justify-center gap-2 rounded-lg bg-spark-400 px-8 text-xl font-bold text-ink transition-transform group-hover:bg-spark-300 group-active:-translate-y-0.5">
+                <BarChart3 className="size-6" /> 결과 보기
+              </span>
+            </Link>
+          ) : (
+            <Button
+              variant={primary?.type === 'END' ? 'ink' : primary?.type === 'CLOSE_QUESTION' ? 'danger' : 'primary'}
+              size="xl"
+              block
+              className="md:w-auto md:min-w-[22rem]"
+              loading={pending}
+              disabled={disabled}
+              onClick={() => void firePrimary()}
+              icon={ceremonyBusy ? <ProgressRing fraction={1 - busyLeft / busySpan} /> : <Icon className="size-6" />}
+            >
+              {primary ? (ceremonyBusy ? '공개 연출 중…' : primary.label) : '대기 중'}
+            </Button>
+          )}
         </div>
       </div>
 

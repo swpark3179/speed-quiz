@@ -1,3 +1,4 @@
+import '../zod-ko';
 import { z } from 'zod';
 
 export const LoginInput = z.object({

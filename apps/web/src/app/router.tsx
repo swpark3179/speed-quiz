@@ -3,7 +3,6 @@ import { createBrowserRouter, Navigate, Outlet } from 'react-router';
 import { Spinner } from '@/ui/display';
 import { RequireAdmin } from '@/features/admin/RequireAdmin';
 import { NotFoundPage, RouteError } from './RouteError';
-import JoinPage from '@/features/join/JoinPage';
 
 function page(load: () => Promise<{ default: ComponentType }>): ReactNode {
   const C = lazy(load);
@@ -32,8 +31,8 @@ export const router = createBrowserRouter([
     element: <Outlet />,
     children: [
       { path: '/', element: <Navigate to="/join" replace /> },
-      { path: '/join', element: <JoinPage /> },
-      { path: '/join/:code', element: <JoinPage /> },
+      { path: '/join', element: page(() => import('@/features/join/JoinPage')) },
+      { path: '/join/:code', element: page(() => import('@/features/join/JoinPage')) },
       { path: '/play/:code', element: page(() => import('@/features/play/PlayPage')) },
       { path: '/screen/:roomId', element: page(() => import('@/features/screen/ScreenPage')) },
       { path: '/admin/login', element: page(() => import('@/features/admin/auth/LoginPage')) },

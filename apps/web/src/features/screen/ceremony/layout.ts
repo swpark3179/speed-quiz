@@ -53,12 +53,19 @@ export function ceremonySlots(count: number): Map<number, Slot> {
   return out;
 }
 
-/** Grand reveal: everything except rank 1 moves aside (same row) or sinks (other row). */
+/**
+ * Grand reveal: rank 1 moves to the stage centre; cards in the same row are pushed further out,
+ * cards in the other row sink below.
+ */
+export function grandSlotOf(grand: Slot): Slot {
+  return { ...grand, x: STAGE_W / 2 - grand.w / 2 };
+}
+
 export function grandShift(slot: Slot, grand: Slot): { dx: number; dy: number } {
   if (slot.row !== grand.row) return { dx: 0, dy: 16 };
-  const center = grand.x + grand.w / 2;
-  const mine = slot.x + slot.w / 2;
-  return { dx: mine < center ? -10 : 10, dy: 0 };
+  const moved = grandSlotOf(grand);
+  const dxG = moved.x - grand.x;
+  return { dx: dxG + (slot.x < grand.x ? -10 : 10), dy: 0 };
 }
 
 export const PODIUM_BLOCK: Record<number, number> = { 1: 17, 2: 12.5, 3: 9 };
@@ -68,9 +75,10 @@ const PODIUM_BOTTOM = 64;
 export function wallSlots(count: number): { slots: Map<number, Slot>; podium: { rank: number; x: number; w: number; h: number }[] } {
   const slots = new Map<number, Slot>();
   const podium: { rank: number; x: number; w: number; h: number }[] = [];
-  const w = 15;
-  const h = 19;
-  const centers: Record<number, number> = count > 3 ? { 2: 20, 1: 38, 3: 56 } : { 2: 42, 1: 60, 3: 78 };
+  const w = count > 3 ? 15 : 17;
+  const h = count > 3 ? 19 : 22;
+  const centers: Record<number, number> =
+    count > 3 ? { 2: 20, 1: 38, 3: 56 } : count === 3 ? { 2: 41, 1: 60, 3: 79 } : count === 2 ? { 2: 50.5, 1: 69.5 } : { 1: 60 };
   for (let r = 1; r <= Math.min(3, count); r++) {
     const bh = PODIUM_BLOCK[r]!;
     const cx = centers[r]!;

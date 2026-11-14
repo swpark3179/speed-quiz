@@ -64,6 +64,17 @@ export function DistributionChart({
                   transition={instant ? { duration: 0 } : { ...spring.layout, delay: i * 0.08 }}
                 />
                 {highlighted && correct && (
+                  <m.span
+                    className={cn('absolute -top-[1.9rem] -right-[1.9rem] z-10 flex size-[3.75rem] items-center justify-center rounded-full bg-success text-white shadow-lg ring-4 ring-white')}
+                    initial={instant ? false : { scale: 0, rotate: -30 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={spring.pop}
+                    aria-label="정답"
+                  >
+                    <Check className="size-[2.4rem]" strokeWidth={4} />
+                  </m.span>
+                )}
+                {highlighted && correct && (
                   <m.div
                     className="pointer-events-none absolute -inset-[0.6rem] rounded-t-[1.6rem] ring-[0.6rem] ring-spark-400"
                     initial={instant ? false : { opacity: 0 }}
@@ -86,17 +97,6 @@ export function DistributionChart({
               >
                 {meta.number}
               </span>
-              {highlighted && correct && (
-                <m.span
-                  className={cn('absolute -top-[1.75rem] -right-[1.25rem] flex size-[3.75rem] items-center justify-center rounded-full bg-success text-white shadow-lg ring-4 ring-white')}
-                  initial={instant ? false : { scale: 0, rotate: -30 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={spring.pop}
-                  aria-label="정답"
-                >
-                  <Check className="size-[2.4rem]" strokeWidth={4} />
-                </m.span>
-              )}
             </div>
           </m.div>
         );
