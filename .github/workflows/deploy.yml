@@ -1,9 +1,8 @@
 name: Deploy
 
-# main 브랜치에 push 되면 리눅스 서버에 자동 배포. Actions 탭에서 수동 실행도 가능.
+# 수동 실행 전용 (Actions 탭 → Deploy → "Run workflow"). push/PR 등 자동 트리거 없음.
+# 서버에 설치된 self-hosted runner 에서 직접 실행되므로 SSH·인바운드 방화벽이 필요 없다.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 # 동시에 두 번 배포되지 않도록 직렬화 (진행 중인 배포는 취소하지 않음)
@@ -16,40 +15,22 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest   # 서버가 사내망 전용이면 self-hosted 로 변경 (docs/deploy.md 참고)
+    runs-on: [self-hosted, linux]
     timeout-minutes: 15
     steps:
+      # _work 폴더에 체크아웃되는 사본은 "최신 deploy.sh 를 실행"하는 용도.
+      # 실제 서비스 폴더(APP_DIR)는 deploy.sh 가 git fast-forward 로 갱신한다.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - name: Prepare SSH
+      - name: Deploy
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_PORT: ${{ secrets.SSH_PORT }}
+          APP_DIR: ${{ vars.APP_DIR }}          # 비우면 러너 계정의 ~/speed-quiz
+          PM2_APP: ${{ vars.PM2_APP }}          # 비우면 speed-quiz
+          BRANCH: main
         run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          if [ -n "$SSH_KNOWN_HOSTS" ]; then
-            printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          else
-            echo "::warning::SSH_KNOWN_HOSTS 시크릿이 없어 ssh-keyscan 으로 대체합니다 (호스트 키 검증 약함)"
-            ssh-keyscan -p "${SSH_PORT:-22}" -T 10 "$SSH_HOST" > ~/.ssh/known_hosts
-          fi
-
-      - name: Deploy over SSH
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_PORT: ${{ secrets.SSH_PORT }}
-          PM2_APP: ${{ vars.PM2_APP }}
-        run: |
-          ssh -i ~/.ssh/id_deploy -p "${SSH_PORT:-22}" \
-              -o IdentitiesOnly=yes -o ServerAliveInterval=30 \
-              "$SSH_USER@$SSH_HOST" \
-              "PM2_APP='${PM2_APP:-speed-quiz}' BRANCH='main' bash -s" < scripts/deploy.sh
-
-      - name: Cleanup
-        if: always()
-        run: rm -f ~/.ssh/id_deploy
+          : "${APP_DIR:=$HOME/speed-quiz}"
+          : "${PM2_APP:=speed-quiz}"
+          export APP_DIR PM2_APP BRANCH
+          bash scripts/deploy.sh
