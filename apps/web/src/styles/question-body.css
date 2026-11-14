@@ -1,0 +1,102 @@
+/* Typography for admin-authored question bodies (sanitized HTML or plain text). */
+.q-body {
+  font-size: var(--q-font, 1.125rem);
+  line-height: 1.5;
+  font-weight: 600;
+  color: inherit;
+  contain: content;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.q-body[data-kind='TEXT'] {
+  white-space: pre-wrap;
+}
+.q-body > * + * {
+  margin-top: 0.5em;
+}
+.q-body h3 {
+  font-size: 1.2em;
+  font-weight: 800;
+}
+.q-body h4 {
+  font-size: 1.08em;
+  font-weight: 800;
+}
+.q-body ul,
+.q-body ol {
+  padding-left: 1.4em;
+  text-align: left;
+}
+.q-body ul {
+  list-style: disc;
+}
+.q-body ol {
+  list-style: decimal;
+}
+.q-body blockquote {
+  border-left: 4px solid var(--color-spark-400);
+  padding-left: 0.8em;
+  color: var(--fg-muted);
+  text-align: left;
+}
+.q-body code,
+.q-body pre {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: color-mix(in oklab, var(--fg) 7%, transparent);
+  border-radius: 6px;
+  padding: 0.05em 0.35em;
+}
+.q-body pre {
+  padding: 0.6em 0.8em;
+  overflow-x: auto;
+  text-align: left;
+  white-space: pre;
+}
+.q-body mark,
+.q-body .q-hl {
+  background: var(--color-spark-200);
+  color: var(--color-ink);
+  border-radius: 4px;
+  padding: 0 0.15em;
+}
+.q-body .q-center {
+  text-align: center;
+}
+.q-body .q-small {
+  font-size: 0.8em;
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.q-body img {
+  max-width: 100%;
+  max-height: var(--q-img-max, 40vh);
+  height: auto;
+  margin-inline: auto;
+  border-radius: var(--radius-md);
+  object-fit: contain;
+}
+.q-body table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin-inline: auto;
+  font-size: 0.9em;
+  max-width: 100%;
+}
+.q-body th,
+.q-body td {
+  border: 1px solid var(--line);
+  padding: 0.3em 0.6em;
+}
+.q-body th {
+  background: color-mix(in oklab, var(--fg) 5%, transparent);
+  font-weight: 800;
+}
+.q-body hr {
+  border: none;
+  border-top: 2px dashed var(--line);
+}
+.q-body rt {
+  font-size: 0.55em;
+}
