@@ -204,6 +204,16 @@ describe('HTTP + realtime integration', () => {
     const text = new TextDecoder().decode(bytes);
     expect(text).toContain('참가자0');
 
+    const rep = await fetch(`${base}/api/admin/rooms/${room.data.id}/report.html`, { headers: { cookie } });
+    expect(rep.status).toBe(200);
+    expect(rep.headers.get('content-type')).toMatch(/text\/html/);
+    expect(rep.headers.get('content-disposition')).toMatch(/^attachment;/);
+    const html = await rep.text();
+    expect(html).toContain('통합 테스트');
+    expect(html).toContain('참가자0');
+    expect(html).toContain('<svg');
+    expect(html).not.toMatch(/<script/i);
+
     for (const p of players) p.socket.close();
     admin.close();
   }, 30_000);

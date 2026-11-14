@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { m } from 'motion/react';
-import { KeyRound, LibraryBig, LogOut, Trophy, Users } from 'lucide-react';
+import { KeyRound, LibraryBig, LogOut, ShieldCheck, Trophy, UserRound } from 'lucide-react';
 import { screenVariants } from '@/design/motion';
 import { cn } from '@/lib/format';
 import { Avatar, Logo } from '@/ui/display';
 import { useLogout, useMe } from '../session';
 import { PasswordChangeDialog } from '../components/common';
 
-const NAV = [
+const BASE_NAV = [
   { to: '/admin/rooms', label: '퀴즈방', icon: Trophy },
   { to: '/admin/questions', label: '문제은행', icon: LibraryBig },
-  { to: '/admin/accounts', label: '관리자 계정', short: '계정', icon: Users },
+  { to: '/admin/me', label: '내 계정', icon: UserRound },
 ] as const;
+const MAIN_NAV = { to: '/admin/accounts', label: '관리자 관리', short: '관리자', icon: ShieldCheck } as const;
+type NavItem = { to: string; label: string; short?: string; icon: typeof Trophy };
 
 export default function AdminLayout() {
   const me = useMe();
@@ -20,6 +22,7 @@ export default function AdminLayout() {
   const loc = useLocation();
   const [pwOpen, setPwOpen] = useState(false);
   const name = me.data?.displayName ?? '';
+  const NAV: NavItem[] = me.data?.role === 'MAIN' ? [...BASE_NAV, MAIN_NAV] : [...BASE_NAV];
   const section = loc.pathname.split('/').slice(0, 3).join('/');
 
   return (
@@ -120,7 +123,8 @@ export default function AdminLayout() {
 
       {/* Bottom tab bar (<md) */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-(--z-sticky) grid grid-cols-3 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        style={{ gridTemplateColumns: `repeat(${NAV.length}, minmax(0, 1fr))` }}
+        className="fixed inset-x-0 bottom-0 z-(--z-sticky) grid border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
         aria-label="관리자 메뉴"
       >
         {NAV.map((item) => {
@@ -138,7 +142,7 @@ export default function AdminLayout() {
                   <span className={cn('flex h-8 w-14 items-center justify-center rounded-full transition-colors', isActive && 'bg-spark-400')}>
                     <Icon className="size-5" aria-hidden="true" />
                   </span>
-                  {'short' in item ? item.short : item.label}
+                  {item.short ?? item.label}
                 </>
               )}
             </NavLink>

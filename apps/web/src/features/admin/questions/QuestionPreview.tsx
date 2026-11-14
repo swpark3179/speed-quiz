@@ -57,14 +57,19 @@ export function PhonePreview({ q }: { q: PreviewQuestion }) {
           <div className="mx-5 h-2.5 overflow-hidden rounded-full bg-n-200">
             <div className="h-full w-2/3 rounded-full bg-spark-400" />
           </div>
-          <div className="fade-mask-y mx-4 mt-3 max-h-[38%] overflow-hidden rounded-lg bg-surface p-4 shadow-sm">
+          {/* Long bodies scroll (swipe on touch) instead of being clipped, like the real phone screen. */}
+          <div
+            className="fade-mask-y mx-4 mt-3 max-h-[38%] shrink-0 touch-pan-y overflow-y-auto overscroll-contain rounded-lg bg-surface p-4 shadow-sm"
+            tabIndex={0}
+            aria-label="문제 내용 (스크롤 가능)"
+          >
             {q.body.trim() || q.imageUrl ? (
               <QuestionBody kind={q.kind} body={q.body} imageUrl={q.imageUrl} variant="mobile" />
             ) : (
               <p className="py-6 text-center font-semibold text-n-400">문제 내용이 여기에 보여요</p>
             )}
           </div>
-          <div className={cn('grid min-h-0 flex-1 gap-2.5 p-4', phoneOnly(phoneGridClass(texts.length, long)), long && 'overflow-hidden')}>
+          <div className={cn('grid min-h-0 flex-1 gap-2.5 p-4', phoneOnly(phoneGridClass(texts.length, long)), long && 'touch-pan-y overflow-y-auto overscroll-contain')}>
             {texts.map((t, i) => (
               <ChoiceButton key={i} position={i} text={t} state="idle" tabIndex={-1} row={long} className={phoneOnly(phoneItemClass(texts.length, i, long))} />
             ))}

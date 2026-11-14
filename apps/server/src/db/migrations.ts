@@ -130,6 +130,15 @@ const MIGRATIONS: string[] = [
   ) STRICT;
   CREATE INDEX ix_answers_participant ON answers(participant_id);
   `,
+  /* 2: roles, question visibility, owner indexes */ `
+  ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'ADMIN' CHECK (role IN ('MAIN','ADMIN'));
+  UPDATE admins SET role = 'MAIN' WHERE id = (SELECT MIN(id) FROM admins);
+
+  ALTER TABLE questions ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0;
+  UPDATE questions SET is_public = 1;
+  CREATE INDEX ix_questions_owner ON questions(created_by);
+  CREATE INDEX ix_rooms_owner ON rooms(created_by);
+  `,
 ];
 
 export function migrate(db: Db): void {

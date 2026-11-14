@@ -26,6 +26,7 @@ interface RoomRow {
   settings: string;
   draft_items: string;
   base_url: string | null;
+  created_by: number | null;
   created_at: number;
   updated_at: number;
   confirmed_at: number | null;
@@ -46,7 +47,34 @@ export class RoomService {
     return r;
   }
 
-  list(): RoomListItem[] {
+  /** Rooms are private to the admin who created them; others get a plain 404. */
+  assertOwned(id: number, adminId: number): void {
+    if (!this.isOwner(id, adminId)) throw new AppError('NOT_FOUND');
+  }
+
+  isOwner(id: number, adminId: number): boolean {
+    const r = this.db.get<{ created_by: number | null }>('SELECT created_by FROM rooms WHERE id = ?', id);
+    return !!r && r.created_by === adminId;
+  }
+
+  /** A question may be used by a room's owner when it is theirs or public. */
+  private questionUsable(questionId: number, ownerId: number | null): boolean {
+    return !!this.db.get(
+      'SELECT 1 FROM questions WHERE id = ? AND deleted_at IS NULL AND (is_public = 1 OR (created_by IS NOT NULL AND created_by = ?))',
+      questionId,
+      ownerId ?? -1,
+    );
+  }
+
+  private assertItemsUsable(items: { questionId: number }[], ownerId: number): void {
+    items.forEach((it, i) => {
+      if (!this.questionUsable(it.questionId, ownerId)) {
+        throw new AppError('ROOM_INVALID', `${i + 1}번째 문제를 사용할 수 없어요. 삭제되었거나 비공개 문제예요.`);
+      }
+    });
+  }
+
+  list(adminId: number): RoomListItem[] {
     const rows = this.db.all<
       RoomRow & { question_count: number; participant_count: number }
     >(
@@ -55,7 +83,9 @@ export class RoomService {
          CASE WHEN r.phase = 'DRAFT' THEN json_array_length(r.draft_items)
               ELSE (SELECT COUNT(*) FROM room_questions q WHERE q.room_id = r.id) END AS question_count
        FROM rooms r LEFT JOIN admins a ON a.id = r.created_by
+       WHERE r.created_by = ?
        ORDER BY CASE WHEN r.phase IN ('DRAFT','ENDED') THEN 1 ELSE 0 END, r.updated_at DESC`,
+      adminId,
     );
     return rows.map((r) => {
       const settings = RoomSettings.parse(JSON.parse(r.settings));
@@ -84,8 +114,9 @@ export class RoomService {
       items = draft.map((it) => {
         const q = this.db.get<{ id: number; kind: QuestionKind; title: string; body: string; time_limit_sec: number | null; n: number }>(
           `SELECT q.id, q.kind, q.title, q.body, q.time_limit_sec, (SELECT COUNT(*) FROM choices c WHERE c.question_id = q.id) AS n
-           FROM questions q WHERE q.id = ? AND q.deleted_at IS NULL`,
+           FROM questions q WHERE q.id = ? AND q.deleted_at IS NULL AND (q.is_public = 1 OR (q.created_by IS NOT NULL AND q.created_by = ?))`,
           it.questionId,
+          r.created_by ?? -1,
         );
         return {
           ...it,
@@ -147,6 +178,7 @@ export class RoomService {
   }
 
   create(input: z.output<typeof RoomInput>, adminId: number): RoomDetailDto {
+    this.assertItemsUsable(input.items, adminId);
     const now = Date.now();
     const id = this.db.run(
       'INSERT INTO rooms (title, settings, draft_items, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
@@ -163,6 +195,7 @@ export class RoomService {
   update(id: number, input: z.output<typeof RoomInput>): RoomDetailDto {
     const r = this.row(id);
     if (r.phase !== 'DRAFT') throw new AppError('ROOM_NOT_DRAFT');
+    if (r.created_by !== null) this.assertItemsUsable(input.items, r.created_by);
     this.db.run(
       'UPDATE rooms SET title = ?, settings = ?, draft_items = ?, updated_at = ? WHERE id = ?',
       input.title,
@@ -214,8 +247,12 @@ export class RoomService {
           explanation: string | null;
           time_limit_sec: number | null;
           version: number;
-        }>('SELECT * FROM questions WHERE id = ? AND deleted_at IS NULL', it.questionId);
-        if (!q) throw new AppError('ROOM_INVALID', `${pos + 1}번째 문제가 삭제되었어요. 목록에서 빼 주세요.`);
+        }>(
+          'SELECT * FROM questions WHERE id = ? AND deleted_at IS NULL AND (is_public = 1 OR (created_by IS NOT NULL AND created_by = ?))',
+          it.questionId,
+          r.created_by ?? -1,
+        );
+        if (!q) throw new AppError('ROOM_INVALID', `${pos + 1}번째 문제를 사용할 수 없어요(삭제 또는 비공개 전환). 목록에서 빼 주세요.`);
         const choices = this.db.all<{ text: string; is_correct: number }>(
           'SELECT text, is_correct FROM choices WHERE question_id = ? ORDER BY position',
           q.id,

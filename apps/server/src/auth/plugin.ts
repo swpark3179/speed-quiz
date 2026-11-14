@@ -30,3 +30,9 @@ export function requireCsrf(req: FastifyRequest): void {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return;
   if (req.headers[CSRF_HEADER] !== CSRF_VALUE) throw new AppError('FORBIDDEN', '잘못된 요청이에요. 페이지를 새로고침해 주세요.');
 }
+
+/** Main-admin-only routes (admin account management). */
+export async function requireMainAdmin(req: FastifyRequest, reply: FastifyReply): Promise<void> {
+  await requireAdmin(req, reply);
+  if (req.admin!.role !== 'MAIN') throw new AppError('FORBIDDEN', '메인 관리자만 사용할 수 있어요.');
+}

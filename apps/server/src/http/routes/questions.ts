@@ -13,11 +13,11 @@ export function questionRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/admin/questions', { preHandler: requireAdmin }, async (req) => {
     const q = parse(QuestionListQuery, req.query);
-    return { ...questions.list(q), page: q.page, pageSize: q.pageSize, tags: questions.tags() };
+    return { ...questions.list(req.admin!.id, q), page: q.page, pageSize: q.pageSize, tags: questions.tags(req.admin!.id) };
   });
 
   app.get('/api/admin/questions/:id', { preHandler: requireAdmin }, async (req) =>
-    questions.get(idParam((req.params as { id: string }).id)),
+    questions.get(idParam((req.params as { id: string }).id), req.admin!.id),
   );
 
   app.post('/api/admin/questions', { preHandler: requireAdmin }, async (req) =>
@@ -29,7 +29,7 @@ export function questionRoutes(app: FastifyInstance, ctx: AppContext): void {
   );
 
   app.delete('/api/admin/questions/:id', { preHandler: requireAdmin }, async (req) => {
-    questions.remove(idParam((req.params as { id: string }).id));
+    questions.remove(idParam((req.params as { id: string }).id), req.admin!.id);
     return { ok: true };
   });
 

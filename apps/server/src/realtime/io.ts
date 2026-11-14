@@ -95,6 +95,7 @@ function rateLimiter(perSecond: number) {
 }
 
 const AnswerBody = z.object({ roomQuestionId: z.number().int(), choiceId: z.number().int() });
+const RenameBody = z.object({ nickname: z.string().max(100) });
 const RoomIdBody = z.object({ roomId: z.number().int().positive() });
 const ControlBody = z.discriminatedUnion('type', [
   z.object({ roomId: z.number().int(), type: z.literal('START_QUESTION'), index: z.number().int() }),
@@ -120,7 +121,7 @@ export function createRealtime(httpServer: HttpServer, ctx: AppContext): { io: S
   const play = io.of('/play') as PlayNs;
   const screen = io.of('/screen') as ScreenNs;
   const admin = io.of('/admin') as AdminNs;
-  const { registry, sessions, db } = ctx;
+  const { registry, sessions, db, rooms } = ctx;
 
   /* ---------------- /play ---------------- */
   play.use((socket, next) => {
@@ -197,6 +198,15 @@ export function createRealtime(httpServer: HttpServer, ctx: AppContext): { io: S
         reply(fail('INTERNAL'));
       }
     });
+    socket.on('me:rename', (payload, ack) => {
+      const reply = safeAck<[Result<{ nickname: string }>]>(ack);
+      if (!allow()) return reply(fail('RATE_LIMITED'));
+      const body = RenameBody.safeParse(payload);
+      if (!body.success) return reply(fail('BAD_REQUEST'));
+      const e = registry.get(roomId);
+      if (!e) return reply(fail('ROOM_NOT_FOUND'));
+      reply(toResult(() => e.rename(pid, body.data.nickname)));
+    });
     socket.on('disconnect', () => {
       registry.peek(roomId)?.disconnect(pid);
     });
@@ -210,7 +220,9 @@ export function createRealtime(httpServer: HttpServer, ctx: AppContext): { io: S
     const engine = registry.get(roomId);
     if (!engine) return next(new Error('ROOM_NOT_FOUND'));
     const cookie = parseCookies(socket.handshake.headers.cookie)[SESSION_COOKIE];
-    const isAdmin = !!sessions.lookup(cookie);
+    const viewer = sessions.lookup(cookie);
+    // A signed-in admin may open the screen only for rooms they created.
+    const isAdmin = !!viewer && rooms.isOwner(roomId, viewer.id);
     const keyOk = typeof auth.key === 'string' && auth.key.length > 0 && auth.key === engine.presenterKey;
     if (!isAdmin && !keyOk) return next(new Error('UNAUTHORIZED'));
     (socket.data as ScreenData) = { roomId };
@@ -263,6 +275,7 @@ export function createRealtime(httpServer: HttpServer, ctx: AppContext): { io: S
       const reply = safeAck<[Result<ReturnType<NonNullable<ReturnType<typeof registry.get>>['adminSnapshot']>>]>(ack);
       const body = RoomIdBody.safeParse(payload);
       if (!body.success) return reply(fail('BAD_REQUEST'));
+      if (!rooms.isOwner(body.data.roomId, a.id)) return reply(fail('ROOM_NOT_FOUND'));
       const e = registry.get(body.data.roomId);
       if (!e) return reply(fail('ROOM_NOT_FOUND'));
       socket.join(roomKey(body.data.roomId));
@@ -280,6 +293,7 @@ export function createRealtime(httpServer: HttpServer, ctx: AppContext): { io: S
       }
       const body = ControlBody.safeParse(payload);
       if (!body.success) return reply(fail('BAD_REQUEST'));
+      if (!rooms.isOwner(body.data.roomId, a.id)) return reply(fail('ROOM_NOT_FOUND'));
       const e = registry.get(body.data.roomId);
       if (!e) return reply(fail('ROOM_NOT_FOUND'));
       reply(

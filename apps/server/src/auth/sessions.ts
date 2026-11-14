@@ -1,3 +1,4 @@
+import type { AdminRole } from '@sq/shared';
 import type { Db } from '../db/driver';
 import { adminsRepo } from '../db/repos/admins';
 import { newToken, sha256 } from './tokens';
@@ -8,6 +9,7 @@ export interface SessionAdmin {
   id: number;
   username: string;
   displayName: string;
+  role: AdminRole;
   sessionHash: string;
 }
 
@@ -52,7 +54,7 @@ export class SessionStore {
     if (row.expires_at - now < this.ttlMs - 5 * 60_000) {
       this.db.run('UPDATE sessions SET expires_at = ? WHERE id_hash = ?', now + this.ttlMs, hash);
     }
-    return { id: admin.id, username: admin.username, displayName: admin.display_name, sessionHash: hash };
+    return { id: admin.id, username: admin.username, displayName: admin.display_name, role: admin.role, sessionHash: hash };
   }
 
   revoke(token: string): void {

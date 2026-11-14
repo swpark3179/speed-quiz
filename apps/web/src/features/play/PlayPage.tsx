@@ -6,7 +6,7 @@ import type { Result } from '@sq/shared';
 import { connectPlay, type PlaySocket } from '@/lib/socket';
 import { serverClock } from '@/lib/clock';
 import { useGameSocket } from '@/stores/useGameSocket';
-import { clearSession, loadSession } from '@/stores/session';
+import { clearSession, loadSession, saveSession } from '@/stores/session';
 import { useDocumentTitle, useHtmlAttr, useWakeLock } from '@/hooks/dom';
 import { haptic, HAPTIC } from '@/design/haptics';
 import { screenVariants } from '@/design/motion';
@@ -125,6 +125,24 @@ function PlayInner({ code, token, nickname }: { code: string; token: string; nic
     [qid, send, state.current?.myAnswer],
   );
 
+  const rename = useCallback(
+    async (nick: string): Promise<string | null> => {
+      if (!socket?.connected) return '연결이 불안정해요. 잠시 후 다시 시도해 주세요.';
+      try {
+        const r = (await socket.timeout(4000).emitWithAck('me:rename', { nickname: nick })) as Result<{ nickname: string }>;
+        if (!r.ok) return r.message;
+        dispatch({ type: 'me:renamed', payload: { nickname: r.data.nickname } });
+        const saved = loadSession(code);
+        if (saved) saveSession({ ...saved, nickname: r.data.nickname });
+        toast.success('닉네임을 바꿨어요.');
+        return null;
+      } catch {
+        return '응답이 없어요. 잠시 후 다시 시도해 주세요.';
+      }
+    },
+    [socket, dispatch, code],
+  );
+
   /* ---------------- render ---------------- */
   if (fatal) return <EndStateScreen reason={fatal} code={code} />;
 
@@ -134,7 +152,7 @@ function PlayInner({ code, token, nickname }: { code: string; token: string; nic
   if (room && state.me) {
     if (phase === 'LOBBY') {
       screenKey = 'lobby';
-      screen = <LobbyScreen state={state} />;
+      screen = <LobbyScreen state={state} onRename={rename} />;
     } else if (phase === 'QUESTION_ACTIVE' && state.current) {
       screenKey = `q-${state.current.question.roomQuestionId}`;
       screen = <QuestionScreen state={state} pending={pending} onSelect={onSelect} />;

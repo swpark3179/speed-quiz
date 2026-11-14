@@ -78,7 +78,8 @@ export type GameEvent =
   | { type: 'game:ended'; payload: GameEndedPayload }
   | { type: 'you:final'; payload: YouFinal }
   | { type: 'screen:view'; payload: { view: ScreenView } }
-  | { type: 'answer:local'; payload: { choiceId: number; receivedAt: number } };
+  | { type: 'answer:local'; payload: { choiceId: number; receivedAt: number } }
+  | { type: 'me:renamed'; payload: { nickname: string } };
 
 const ROSTER_MAX = 400;
 
@@ -121,9 +122,17 @@ export function gameReducer(s: GameState, e: GameEvent): GameState {
     }
     case 'roster:delta': {
       const removed = new Set(e.payload.removed);
-      const known = new Set(s.roster.map((r) => r.id));
-      const roster = [...s.roster.filter((r) => !removed.has(r.id)), ...e.payload.added.filter((a) => !known.has(a.id))];
-      return { ...s, roster: roster.slice(-ROSTER_MAX), rosterCount: e.payload.count };
+      const kept = s.roster.filter((r) => !removed.has(r.id));
+      // `known` is computed after removals so a rename (same id removed + added) re-adds the entry.
+      const known = new Set(kept.map((r) => r.id));
+      const roster = [...kept, ...e.payload.added.filter((a) => !known.has(a.id))];
+      const mine = s.me ? e.payload.added.find((a) => a.id === s.me!.id) : undefined;
+      return {
+        ...s,
+        roster: roster.slice(-ROSTER_MAX),
+        rosterCount: e.payload.count,
+        me: mine && s.me ? { ...s.me, nickname: mine.nickname } : s.me,
+      };
     }
     case 'question:start': {
       const g = gate(s, e.payload.v);
@@ -150,6 +159,8 @@ export function gameReducer(s: GameState, e: GameEvent): GameState {
       if (!s.current || s.current.question.roomQuestionId !== e.payload.roomQuestionId) return s;
       return { ...s, current: { ...s.current, answeredCount: e.payload.answeredCount, activeCount: e.payload.activeCount } };
     }
+    case 'me:renamed':
+      return s.me ? { ...s, me: { ...s.me, nickname: e.payload.nickname } } : s;
     case 'answer:local': {
       if (!s.current) return s;
       return { ...s, current: { ...s.current, myAnswer: e.payload } };

@@ -304,6 +304,8 @@ export interface PlayClientToServer {
   'time:ping': (ack: (serverNow: number) => void) => void;
   'state:get': (ack: Ack<PlaySnapshot>) => void;
   'answer:submit': (p: { roomQuestionId: number; choiceId: number }, ack: Ack<{ receivedAt: number; choiceId: number }>) => void;
+  /** Change my nickname (lobby only). */
+  'me:rename': (p: { nickname: string }, ack: Ack<{ nickname: string }>) => void;
 }
 
 /* ---------- /screen ---------- */

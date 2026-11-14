@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { m } from 'motion/react';
 import { toast } from 'sonner';
-import { ArrowLeft, Check, Copy, Download, KeyRound, Pencil, Play, RotateCcw, Rocket, Trash2, Undo2 } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Download, FileText, KeyRound, Pencil, Play, RotateCcw, Rocket, Trash2, Undo2 } from 'lucide-react';
 import { PHASE_LABELS, isLivePhase, type RoomDetailDto, type RoomResultsDto } from '@sq/shared';
 import { choiceMeta } from '@/design/choices';
 import { cappedStagger, spring } from '@/design/motion';
@@ -355,6 +355,15 @@ export default function RoomDetailPage() {
               description={live ? '진행 중에는 5초마다 새로 고쳐져요.' : undefined}
               actions={
                 <div className="flex flex-wrap gap-2">
+                  {r.phase === 'ENDED' && (
+                    <a
+                      href={`/api/admin/rooms/${r.id}/report.html`}
+                      download
+                      className="inline-flex h-10 items-center gap-1.5 rounded-sm bg-ink px-3 text-sm font-bold text-white hover:bg-n-800"
+                    >
+                      <FileText className="size-4" /> 리포트 다운로드
+                    </a>
+                  )}
                   <a
                     href={`/api/admin/rooms/${r.id}/results.csv?type=ranking`}
                     download
