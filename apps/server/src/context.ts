@@ -5,6 +5,7 @@ import type { RoomRegistry } from './game/registry';
 import type { QuestionService } from './services/question-service';
 import type { RoomService } from './services/room-service';
 import type { ResultsService } from './services/results-service';
+import type { StatsService } from './services/stats-service';
 
 export interface AppContext {
   config: Config;
@@ -14,5 +15,6 @@ export interface AppContext {
   questions: QuestionService;
   rooms: RoomService;
   results: ResultsService;
+  stats: StatsService;
   backup: (reason: string) => void;
 }

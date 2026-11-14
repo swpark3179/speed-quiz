@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { m } from 'motion/react';
-import { KeyRound, LibraryBig, LogOut, ShieldCheck, Trophy, UserRound } from 'lucide-react';
+import { BarChart3, KeyRound, LibraryBig, LogOut, ShieldCheck, Trophy, UserRound } from 'lucide-react';
 import { screenVariants } from '@/design/motion';
 import { cn } from '@/lib/format';
 import { Avatar, Logo } from '@/ui/display';
@@ -13,7 +13,10 @@ const BASE_NAV = [
   { to: '/admin/questions', label: '문제은행', icon: LibraryBig },
   { to: '/admin/me', label: '내 계정', icon: UserRound },
 ] as const;
-const MAIN_NAV = { to: '/admin/accounts', label: '관리자 관리', short: '관리자', icon: ShieldCheck } as const;
+const MAIN_NAV = [
+  { to: '/admin/stats', label: '이용 현황', short: '현황', icon: BarChart3 },
+  { to: '/admin/accounts', label: '관리자 관리', short: '관리자', icon: ShieldCheck },
+] as const;
 type NavItem = { to: string; label: string; short?: string; icon: typeof Trophy };
 
 export default function AdminLayout() {
@@ -22,7 +25,7 @@ export default function AdminLayout() {
   const loc = useLocation();
   const [pwOpen, setPwOpen] = useState(false);
   const name = me.data?.displayName ?? '';
-  const NAV: NavItem[] = me.data?.role === 'MAIN' ? [...BASE_NAV, MAIN_NAV] : [...BASE_NAV];
+  const NAV: NavItem[] = me.data?.role === 'MAIN' ? [...BASE_NAV, ...MAIN_NAV] : [...BASE_NAV];
   const section = loc.pathname.split('/').slice(0, 3).join('/');
 
   return (

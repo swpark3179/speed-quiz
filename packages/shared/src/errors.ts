@@ -10,6 +10,10 @@ export const ERROR_MESSAGES = {
   ACCOUNT_DISABLED: '비활성화된 계정이에요.',
   USERNAME_TAKEN: '이미 사용 중인 아이디예요.',
   CANNOT_DISABLE_SELF: '자기 자신은 비활성화할 수 없어요.',
+  CANNOT_DEMOTE_SELF: '자기 자신의 메인 권한은 해제할 수 없어요.',
+  LAST_MAIN_ADMIN: '활성 메인 관리자가 최소 한 명은 있어야 해요.',
+  DISPLAY_NAME_TAKEN: '이미 사용 중인 닉네임이에요.',
+  SIGNUP_DISABLED: '지금은 가입을 받지 않고 있어요.',
   NICKNAME_INVALID: '닉네임은 1~12자로 입력해 주세요.',
   NICKNAME_TAKEN: '이미 사용 중인 닉네임이에요. 다른 닉네임을 입력해 주세요.',
   ROOM_NOT_FOUND: '퀴즈방을 찾을 수 없어요. 코드를 확인해 주세요.',
@@ -68,6 +72,7 @@ function defaultStatus(code: ErrorCode): number {
       return 401;
     case 'FORBIDDEN':
     case 'ACCOUNT_DISABLED':
+    case 'SIGNUP_DISABLED':
     case 'KICKED':
       return 403;
     case 'NOT_FOUND':
@@ -82,6 +87,8 @@ function defaultStatus(code: ErrorCode): number {
     case 'CONFLICT':
     case 'NICKNAME_TAKEN':
     case 'USERNAME_TAKEN':
+    case 'DISPLAY_NAME_TAKEN':
+    case 'LAST_MAIN_ADMIN':
     case 'ROOM_FULL':
     case 'NOT_JOINABLE':
     case 'ROOM_NOT_DRAFT':

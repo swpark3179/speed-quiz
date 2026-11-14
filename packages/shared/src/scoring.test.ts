@@ -125,4 +125,17 @@ describe('sanitize policy helpers', () => {
     expect(isSafeStyleValue('url(http://x)')).toBe(false);
     expect(isSafeStyleValue('rgb(1, 2, 3)')).toBe(true);
   });
+
+  it('allows box/typography props but keeps layout escapes and bad lengths out', () => {
+    expect(filterStyle('font-size: 1.2em; padding: 4px 8px; border: 1px solid #ccc; border-collapse: collapse')).toBe(
+      'font-size: 1.2em; padding: 4px 8px; border: 1px solid #ccc; border-collapse: collapse',
+    );
+    expect(filterStyle('z-index: 9; transform: scale(2); display: block; float: left; top: 0')).toBe('');
+    expect(filterStyle('margin: -40px 0')).toBe('');
+    expect(filterStyle('width: calc(100% + 10px)')).toBe('');
+    expect(filterStyle('width: 100vw')).toBe('');
+    expect(filterStyle('border: 1px solid url(http://x)')).toBe('');
+    expect(filterStyle('background-color: expression(alert(1))')).toBe('');
+    expect(filterStyle('width: 80%; max-width: 600px')).toBe('width: 80%; max-width: 600px');
+  });
 });

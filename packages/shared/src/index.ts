@@ -9,3 +9,4 @@ export * from './schemas/question';
 export * from './schemas/settings';
 export * from './schemas/room';
 export * from './schemas/auth';
+export * from './schemas/stats';

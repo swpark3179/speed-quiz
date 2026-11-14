@@ -15,6 +15,7 @@ import { useDeleteQuestion, useDuplicateQuestion, useQuestion, useSaveQuestion }
 import { PageHeader } from '../components/common';
 import { ChoiceEditor, HtmlToolbar, TagInput, newChoiceKey, type ChoiceDraft } from './editor-parts';
 import { PhonePreview, StagePreview } from './QuestionPreview';
+import { HtmlImportButton } from './HtmlImport';
 
 interface Draft {
   kind: QuestionKind;
@@ -282,7 +283,12 @@ export default function QuestionEditPage() {
                 <label htmlFor="question-body" className="text-sm font-bold">
                   문제
                 </label>
-                <span className="tabular text-xs font-semibold text-fg-muted">{questionTextLength(draft.kind, draft.body)}자</span>
+                <div className="flex items-center gap-3">
+                  {draft.kind === 'HTML' && !readOnly && (
+                    <HtmlImportButton hasBody={!!draft.body.trim()} onApply={(html) => set('body', html)} />
+                  )}
+                  <span className="tabular text-xs font-semibold text-fg-muted">{questionTextLength(draft.kind, draft.body)}자</span>
+                </div>
               </div>
               <div className="flex flex-col">
                 {draft.kind === 'HTML' && <HtmlToolbar textareaRef={bodyRef} value={draft.body} onChange={(v) => set('body', v)} />}
@@ -295,7 +301,11 @@ export default function QuestionEditPage() {
                   value={draft.body}
                   onChange={(e) => set('body', e.target.value)}
                   error={errors.body}
-                  hint={draft.kind === 'HTML' ? '스크립트·링크·외부 이미지는 저장할 때 자동으로 제거돼요.' : undefined}
+                  hint={
+                    draft.kind === 'HTML'
+                      ? '스크립트·링크·외부 이미지는 저장할 때 자동으로 제거돼요. CSS·이미지가 든 HTML 묶음은 "HTML 파일 불러오기"로 가져오세요.'
+                      : undefined
+                  }
                 />
               </div>
             </div>
@@ -407,7 +417,13 @@ export default function QuestionEditPage() {
           )}
         </form>
 
-        <aside className={cn('flex min-w-0 flex-col gap-4 lg:sticky lg:top-8 lg:self-start', tab !== 'preview' && 'hidden lg:flex')}>
+        <aside
+          className={cn(
+            // never taller than the viewport while sticky, so the bottom of the preview stays reachable
+            'flex min-w-0 flex-col gap-4 lg:sticky lg:top-8 lg:max-h-[calc(100dvh-4rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain',
+            tab !== 'preview' && 'hidden lg:flex',
+          )}
+        >
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-extrabold">미리보기</h2>
             <Segmented

@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import type {
   AdminCreateInput,
   AdminDto,
+  AdminRole,
+  AdminStatsDto,
   ConfirmResult,
   QuestionDto,
   QuestionInput,
@@ -27,6 +29,7 @@ export const qk = {
   room: (id: number) => ['rooms', 'one', id] as const,
   results: (id: number) => ['rooms', 'results', id] as const,
   admins: ['admins'] as const,
+  stats: (days: number) => ['admins', 'stats', days] as const,
   serverInfo: ['server-info'] as const,
 };
 
@@ -190,9 +193,19 @@ export function useCreateAdmin() {
 export function usePatchAdmin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...body }: { id: number; displayName?: string; disabled?: boolean; password?: string }) =>
+    mutationFn: ({ id, ...body }: { id: number; displayName?: string; disabled?: boolean; password?: string; role?: AdminRole }) =>
       patch<AdminDto>(`/api/admin/admins/${id}`, body),
     onSuccess: () => void qc.invalidateQueries({ queryKey: qk.admins }),
+  });
+}
+
+/** Usage overview for the main admin (counts only). Days bucket in the viewer's local time. */
+export function useAdminStats(days: number) {
+  return useQuery({
+    queryKey: qk.stats(days),
+    queryFn: ({ signal }) => get<AdminStatsDto>(`/api/admin/stats?days=${days}&tz=${-new Date().getTimezoneOffset()}`, signal),
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
   });
 }
 

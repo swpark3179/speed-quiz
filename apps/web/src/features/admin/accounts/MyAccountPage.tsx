@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { KeyRound, Save } from 'lucide-react';
-import { ProfilePatchInput } from '@sq/shared';
+import { DISPLAY_NAME_MAX, ProfilePatchInput } from '@sq/shared';
 import { errorText } from '@/lib/api';
 import { dateTime } from '@/lib/format';
 import { useDocumentTitle } from '@/hooks/dom';
@@ -37,11 +37,11 @@ export default function MyAccountPage() {
 
   const submit = async () => {
     const parsed = ProfilePatchInput.safeParse({ displayName: name });
-    if (!parsed.success) return setError(parsed.error.issues[0]?.message ?? '이름을 확인해 주세요.');
+    if (!parsed.success) return setError(parsed.error.issues[0]?.message ?? '닉네임을 확인해 주세요.');
     try {
       await update.mutateAsync(parsed.data);
       setError(null);
-      toast.success('이름을 바꿨어요.');
+      toast.success('닉네임을 바꿨어요.');
     } catch (err) {
       setError(errorText(err));
     }
@@ -49,7 +49,7 @@ export default function MyAccountPage() {
 
   return (
     <>
-      <PageHeader title="내 계정" description="내 계정 정보를 확인하고 이름과 비밀번호를 바꿀 수 있어요." />
+      <PageHeader title="내 계정" description="내 계정 정보를 확인하고 닉네임과 비밀번호를 바꿀 수 있어요." />
       <div className="flex max-w-2xl flex-col gap-6">
         <SectionCard>
           <div className="flex items-center gap-4">
@@ -74,7 +74,7 @@ export default function MyAccountPage() {
           </dl>
         </SectionCard>
 
-        <SectionCard title="이름 변경" description="다른 관리자와 참여자에게 보이는 표시 이름이에요.">
+        <SectionCard title="닉네임 변경" description="다른 관리자에게 보이는 이름이에요. 다른 관리자와 겹치지 않아야 해요.">
           <form
             className="flex flex-col gap-4"
             onSubmit={(e) => {
@@ -82,7 +82,7 @@ export default function MyAccountPage() {
               void submit();
             }}
           >
-            <TextField label="이름" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} error={error} />
+            <TextField label="닉네임" maxLength={DISPLAY_NAME_MAX} value={name} onChange={(e) => setName(e.target.value)} error={error} />
             <div>
               <Button type="submit" disabled={!dirty} loading={update.isPending} icon={<Save className="size-5" />}>
                 저장

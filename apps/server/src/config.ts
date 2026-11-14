@@ -18,6 +18,8 @@ export interface Config {
   sessionTtlMs: number;
   adminInitialUsername: string | null;
   adminInitialPassword: string | null;
+  /** Allow self-service admin sign-up from the login screen (auto-approved). */
+  signupEnabled: boolean;
   answerGraceMs: number;
   maxUploadBytes: number;
   logLevel: string;
@@ -76,6 +78,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     sessionTtlMs: int(env.SESSION_TTL_HOURS, 12) * 3600_000,
     adminInitialUsername: env.ADMIN_INITIAL_USERNAME || null,
     adminInitialPassword: env.ADMIN_INITIAL_PASSWORD || null,
+    signupEnabled: bool(env.SIGNUP_ENABLED, true),
     answerGraceMs: int(env.ANSWER_GRACE_MS, 300),
     maxUploadBytes: int(env.MAX_UPLOAD_MB, 5) * 1024 * 1024,
     logLevel: env.LOG_LEVEL || 'info',

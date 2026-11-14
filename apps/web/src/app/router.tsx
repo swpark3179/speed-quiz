@@ -36,6 +36,7 @@ export const router = createBrowserRouter([
       { path: '/play/:code', element: page(() => import('@/features/play/PlayPage')) },
       { path: '/screen/:roomId', element: page(() => import('@/features/screen/ScreenPage')) },
       { path: '/admin/login', element: page(() => import('@/features/admin/auth/LoginPage')) },
+      { path: '/admin/signup', element: page(() => import('@/features/admin/auth/SignupPage')) },
       {
         path: '/admin/rooms/:id/live',
         element: <RequireAdmin>{page(() => import('@/features/admin/live/LivePage'))}</RequireAdmin>,
@@ -56,6 +57,10 @@ export const router = createBrowserRouter([
           {
             path: 'accounts',
             element: <RequireMainAdmin>{page(() => import('@/features/admin/accounts/AccountsPage'))}</RequireMainAdmin>,
+          },
+          {
+            path: 'stats',
+            element: <RequireMainAdmin>{page(() => import('@/features/admin/stats/StatsPage'))}</RequireMainAdmin>,
           },
         ],
       },

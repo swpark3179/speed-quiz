@@ -13,6 +13,16 @@ export function useMe() {
   });
 }
 
+/** Whether the server accepts self-service sign-up (SIGNUP_ENABLED). */
+export function useSignupEnabled() {
+  return useQuery({
+    queryKey: ['auth', 'signup'],
+    queryFn: () => get<{ enabled: boolean }>('/api/auth/signup'),
+    staleTime: 300_000,
+    retry: false,
+  });
+}
+
 export function useLogout() {
   const qc = useQueryClient();
   return async () => {

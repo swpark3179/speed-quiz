@@ -75,8 +75,8 @@ export function QuestionScene({ state }: { state: GameState }) {
         layout
         transition={spring.layout}
         className={cn(
-          'relative shrink-0 overflow-hidden rounded-[2.25rem] bg-surface shadow-md ring-1 ring-line/60',
-          revealing ? 'px-[3rem] py-[1.5rem]' : 'max-h-[29rem] px-[3.5rem] py-[2.5rem]',
+          'relative flex shrink-0 flex-col overflow-hidden rounded-[2.25rem] bg-surface shadow-md ring-1 ring-line/60',
+          revealing ? 'px-[3rem] py-[1.5rem]' : 'max-h-[29rem]',
         )}
       >
         {revealing ? (
@@ -84,12 +84,15 @@ export function QuestionScene({ state }: { state: GameState }) {
             {q.kind === 'HTML' ? htmlToText(q.body) : q.body}
           </m.p>
         ) : (
-          <m.div layout="position" className={cn('flex h-full items-center gap-[3rem]', q.imageUrl && 'justify-between')}>
-            <QuestionBody kind={q.kind} body={q.body} variant="stage" className="min-w-0 flex-1" />
-            {q.imageUrl && (
-              <img src={q.imageUrl} alt="" className="max-h-[24rem] w-[40%] shrink-0 rounded-[1.5rem] object-contain" />
-            )}
-          </m.div>
+          // Long questions scroll with the presenter's mouse wheel instead of being clipped.
+          <div className="fade-mask-y min-h-0 overflow-y-auto overscroll-contain px-[3.5rem] py-[2.5rem]" tabIndex={-1}>
+            <m.div layout="position" className={cn('flex items-center gap-[3rem]', q.imageUrl && 'justify-between')}>
+              <QuestionBody kind={q.kind} body={q.body} variant="stage" className="min-w-0 flex-1" />
+              {q.imageUrl && (
+                <img src={q.imageUrl} alt="" className="max-h-[24rem] w-[40%] shrink-0 rounded-[1.5rem] object-contain" />
+              )}
+            </m.div>
+          </div>
         )}
       </m.section>
 

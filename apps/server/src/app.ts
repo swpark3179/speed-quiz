@@ -20,6 +20,7 @@ import { nullBus, realClock, realScheduler, type Clock, type Scheduler } from '.
 import { QuestionService } from './services/question-service';
 import { RoomService } from './services/room-service';
 import { ResultsService } from './services/results-service';
+import { StatsService } from './services/stats-service';
 import { createRealtime } from './realtime/io';
 import { authRoutes } from './http/routes/auth';
 import { questionRoutes } from './http/routes/questions';
@@ -83,6 +84,7 @@ export async function buildApp(config: Config, opts: BuildOptions = {}): Promise
     questions: new QuestionService(db),
     rooms: new RoomService(db, registry),
     results: new ResultsService(db),
+    stats: new StatsService(db),
     backup,
   };
 

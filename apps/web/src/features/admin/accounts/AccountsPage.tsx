@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { m } from 'motion/react';
 import { toast } from 'sonner';
-import { KeyRound, Plus, UserPlus } from 'lucide-react';
-import { AdminCreateInput, PASSWORD_MIN, type AdminDto } from '@sq/shared';
+import { KeyRound, Plus, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react';
+import { AdminCreateInput, DISPLAY_NAME_MAX, PASSWORD_MIN, type AdminDto } from '@sq/shared';
 import { cappedStagger, spring } from '@/design/motion';
 import { errorText } from '@/lib/api';
 import { cn, dateTime } from '@/lib/format';
@@ -38,7 +38,8 @@ function CreateAdminDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       toast.success(`${parsed.data.displayName} 관리자를 추가했어요.`);
       close(false);
     } catch (err) {
-      setError({ field: 'username', message: errorText(err) });
+      const code = (err as { code?: string }).code;
+      setError({ field: code === 'DISPLAY_NAME_TAKEN' ? 'displayName' : 'username', message: errorText(err) });
     }
   };
   const err = (f: string) => (error?.field === f ? error.message : null);
@@ -47,7 +48,7 @@ function CreateAdminDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       open={open}
       onOpenChange={close}
       title="관리자 추가"
-      description="추가한 관리자는 자신의 퀴즈방과 문제은행을 따로 관리해요. (관리자 관리 화면은 메인 관리자만 볼 수 있어요.)"
+      description="추가한 관리자는 자신의 퀴즈방과 문제은행을 따로 관리해요. 필요하면 추가한 뒤 메인 권한을 줄 수 있어요."
       footer={
         <>
           <Button variant="ghost" onClick={() => close(false)}>
@@ -75,7 +76,14 @@ function CreateAdminDialog({ open, onOpenChange }: { open: boolean; onOpenChange
           onChange={(e) => setForm({ ...form, username: e.target.value })}
           error={err('username')}
         />
-        <TextField label="이름" value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} error={err('displayName')} />
+        <TextField
+          label="닉네임"
+          maxLength={DISPLAY_NAME_MAX}
+          hint="다른 관리자와 겹치지 않아야 해요."
+          value={form.displayName}
+          onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+          error={err('displayName')}
+        />
         <TextField
           label="초기 비밀번호"
           type="password"
@@ -150,12 +158,14 @@ export default function AccountsPage() {
   const [pwOpen, setPwOpen] = useState(false);
   const [resetFor, setResetFor] = useState<AdminDto | null>(null);
   const [toggleFor, setToggleFor] = useState<AdminDto | null>(null);
+  const [roleFor, setRoleFor] = useState<AdminDto | null>(null);
+  const granting = roleFor?.role !== 'MAIN';
 
   return (
     <>
       <PageHeader
         title="관리자 계정"
-        description="일반 관리자는 자신이 만든 퀴즈방과 문제은행만 다뤄요. 이 화면은 메인 관리자만 볼 수 있어요."
+        description="일반 관리자는 자신이 만든 퀴즈방과 문제은행만 다뤄요. 메인 관리자는 계정 관리와 이용 현황을 볼 수 있고, 다른 계정에 메인 권한을 주거나 뺄 수 있어요."
         actions={
           <Button icon={<Plus className="size-5" />} onClick={() => setCreateOpen(true)}>
             관리자 추가
@@ -209,6 +219,14 @@ export default function AccountsPage() {
                           </Button>
                           <Button
                             size="sm"
+                            variant="subtle"
+                            icon={a.role === 'MAIN' ? <ShieldOff className="size-4" /> : <ShieldCheck className="size-4" />}
+                            onClick={() => setRoleFor(a)}
+                          >
+                            {a.role === 'MAIN' ? '메인 권한 해제' : '메인 권한 부여'}
+                          </Button>
+                          <Button
+                            size="sm"
                             variant={a.disabled ? 'success' : 'ghost'}
                             onClick={() => (a.disabled ? patchAdmin.mutate({ id: a.id, disabled: false }, { onSuccess: () => toast.success('계정을 활성화했어요.'), onError: (e) => toast.error(errorText(e)) }) : setToggleFor(a))}
                           >
@@ -234,6 +252,27 @@ export default function AccountsPage() {
       <CreateAdminDialog open={createOpen} onOpenChange={setCreateOpen} />
       <ResetPasswordDialog admin={resetFor} onClose={() => setResetFor(null)} />
       <PasswordChangeDialog open={pwOpen} onOpenChange={setPwOpen} />
+      <ConfirmDialog
+        open={!!roleFor}
+        onOpenChange={(v) => !v && setRoleFor(null)}
+        title={granting ? `${roleFor?.displayName ?? ''}님에게 메인 권한을 줄까요?` : `${roleFor?.displayName ?? ''}님의 메인 권한을 해제할까요?`}
+        description={
+          granting
+            ? '메인 관리자는 관리자 계정 추가·비활성화·비밀번호 재설정, 메인 권한 부여·해제, 이용 현황 화면을 쓸 수 있어요. 다른 관리자의 비공개 문제와 퀴즈방 내용은 메인도 볼 수 없어요.'
+            : '해제하면 바로 일반 관리자가 되어 관리자 관리·현황 화면을 쓸 수 없어요. 만든 문제와 퀴즈방은 그대로 남아요.'
+        }
+        confirmLabel={granting ? '메인 권한 부여' : '권한 해제'}
+        tone={granting ? undefined : 'danger'}
+        onConfirm={async () => {
+          if (!roleFor) return;
+          try {
+            await patchAdmin.mutateAsync({ id: roleFor.id, role: granting ? 'MAIN' : 'ADMIN' });
+            toast.success(granting ? `${roleFor.displayName}님을 메인 관리자로 지정했어요.` : `${roleFor.displayName}님의 메인 권한을 해제했어요.`);
+          } catch (err) {
+            toast.error(errorText(err));
+          }
+        }}
+      />
       <ConfirmDialog
         open={!!toggleFor}
         onOpenChange={(v) => !v && setToggleFor(null)}
