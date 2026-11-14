@@ -115,3 +115,12 @@ export function makeRoom(w: World, questionIds: number[], settings: RoomSettings
   const engine = w.registry.get(room.id)!;
   return { room, confirm, engine };
 }
+
+/** Insert another (regular) admin and return its id. */
+export function addAdmin(w: World, username: string): number {
+  return w.db.run(
+    "INSERT INTO admins (username, display_name, password_hash, created_at) VALUES (?, ?, 'x', 0)",
+    username,
+    username,
+  ).lastInsertRowid;
+}

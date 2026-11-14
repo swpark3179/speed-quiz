@@ -95,6 +95,7 @@ function rateLimiter(perSecond: number) {
 }
 
 const AnswerBody = z.object({ roomQuestionId: z.number().int(), choiceId: z.number().int() });
+const RenameBody = z.object({ nickname: z.string().max(100) });
 const RoomIdBody = z.object({ roomId: z.number().int().positive() });
 const ControlBody = z.discriminatedUnion('type', [
   z.object({ roomId: z.number().int(), type: z.literal('START_QUESTION'), index: z.number().int() }),
@@ -196,6 +197,15 @@ export function createRealtime(httpServer: HttpServer, ctx: AppContext): { io: S
         console.error(err);
         reply(fail('INTERNAL'));
       }
+    });
+    socket.on('me:rename', (payload, ack) => {
+      const reply = safeAck<[Result<{ nickname: string }>]>(ack);
+      if (!allow()) return reply(fail('RATE_LIMITED'));
+      const body = RenameBody.safeParse(payload);
+      if (!body.success) return reply(fail('BAD_REQUEST'));
+      const e = registry.get(roomId);
+      if (!e) return reply(fail('ROOM_NOT_FOUND'));
+      reply(toResult(() => e.rename(pid, body.data.nickname)));
     });
     socket.on('disconnect', () => {
       registry.peek(roomId)?.disconnect(pid);

@@ -57,6 +57,17 @@ describe('gameReducer', () => {
     expect(s.needsResync).toBe(false);
   });
 
+  it('applies a rename delta (same id removed and added) and updates me', () => {
+    let s = gameReducer(initialGame, { type: 'state:sync', payload: snap });
+    s = gameReducer(s, { type: 'roster:delta', payload: { added: [{ id: 8, nickname: '너' }], removed: [], count: 2 } });
+    s = gameReducer(s, { type: 'roster:delta', payload: { added: [{ id: 7, nickname: '새이름' }], removed: [7], count: 2 } });
+    expect(s.roster.map((r) => r.nickname).sort()).toEqual(['너', '새이름']);
+    expect(s.roster).toHaveLength(2);
+    expect(s.me?.nickname).toBe('새이름');
+    s = gameReducer(s, { type: 'me:renamed', payload: { nickname: '또바뀜' } });
+    expect(s.me?.nickname).toBe('또바뀜');
+  });
+
   it('flags version gaps for resync', () => {
     let s = gameReducer(initialGame, { type: 'state:sync', payload: snap });
     s = gameReducer(s, { type: 'question:start', payload: { ...start, v: 9 } });

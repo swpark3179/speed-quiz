@@ -1,13 +1,87 @@
+import { useState } from 'react';
 import { m } from 'motion/react';
+import { Pencil } from 'lucide-react';
+import { NICKNAME_MAX, graphemeLength, normalizeNickname } from '@sq/shared';
+import { Button } from '@/ui/Button';
+import { Modal } from '@/ui/Dialog';
+import { TextField } from '@/ui/fields';
 import type { GameState } from '@/stores/game.reducer';
 import { Avatar } from '@/ui/display';
 import { AvatarCloud } from '@/game/AvatarCloud';
 import { CountUp, ShapeDrift, WaitingDots } from '@/game/effects';
 import { spring } from '@/design/motion';
 
-export function LobbyScreen({ state }: { state: GameState }) {
+/** Resolves with null on success, or the message to show under the field. */
+export type RenameFn = (nickname: string) => Promise<string | null>;
+
+function RenameDialog({ open, onOpenChange, current, onRename }: { open: boolean; onOpenChange: (v: boolean) => void; current: string; onRename: RenameFn }) {
+  const [value, setValue] = useState(current);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const len = graphemeLength(normalizeNickname(value));
+
+  const submit = async () => {
+    if (len < 1 || len > NICKNAME_MAX) return setError(`닉네임은 1~${NICKNAME_MAX}자로 입력해 주세요.`);
+    setBusy(true);
+    const err = await onRename(value);
+    setBusy(false);
+    if (err) setError(err);
+    else onOpenChange(false);
+  };
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={(v) => {
+        if (v) {
+          setValue(current);
+          setError(null);
+        }
+        onOpenChange(v);
+      }}
+      title="닉네임 변경"
+      description="퀴즈가 시작되기 전까지만 바꿀 수 있어요."
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            취소
+          </Button>
+          <Button loading={busy} onClick={() => void submit()}>
+            변경하기
+          </Button>
+        </>
+      }
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
+        <TextField
+          label="새 닉네임"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setError(null);
+          }}
+          counter={`${len}/${NICKNAME_MAX}`}
+          error={error}
+          autoComplete="nickname"
+          enterKeyHint="done"
+          maxLength={40}
+        />
+      </form>
+    </Modal>
+  );
+}
+
+export function LobbyScreen({ state, onRename }: { state: GameState; onRename?: RenameFn }) {
   const me = state.me!;
   const midGame = state.room && state.room.phase !== 'LOBBY';
+  const [renameOpen, setRenameOpen] = useState(false);
+  const canRename = !!onRename && state.room?.phase === 'LOBBY';
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <section className="relative overflow-hidden bg-spark-400 px-6 pt-8 pb-10 text-center text-ink">
@@ -32,6 +106,16 @@ export function LobbyScreen({ state }: { state: GameState }) {
             <span className="max-w-[14rem] truncate text-xl font-extrabold" title={me.nickname}>
               {me.nickname}
             </span>
+            {canRename && (
+              <button
+                type="button"
+                onClick={() => setRenameOpen(true)}
+                className="inline-flex size-9 items-center justify-center rounded-full bg-ink/10 text-ink hover:bg-ink/20"
+                aria-label="닉네임 변경"
+              >
+                <Pencil className="size-4" aria-hidden="true" />
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -43,6 +127,7 @@ export function LobbyScreen({ state }: { state: GameState }) {
           <AvatarCloud roster={state.roster} total={state.rosterCount} meId={me.id} max={50} size={32} />
         </div>
       </section>
+      {onRename && <RenameDialog open={renameOpen && canRename} onOpenChange={setRenameOpen} current={me.nickname} onRename={onRename} />}
     </div>
   );
 }

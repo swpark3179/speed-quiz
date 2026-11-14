@@ -537,6 +537,33 @@ export class RoomEngine {
     return { participantId: id, token };
   }
 
+  /** Lets a participant change their own nickname, but only while the game has not started. */
+  rename(pid: number, rawNickname: string): { nickname: string } {
+    const p = this.participants.get(pid);
+    if (!p || p.kicked) throw new AppError('NOT_FOUND');
+    if (this.phase !== 'LOBBY') {
+      throw new AppError('INVALID_TRANSITION', '퀴즈가 시작된 뒤에는 닉네임을 바꿀 수 없어요.');
+    }
+    const check = validateNickname(rawNickname);
+    if (!check.ok) throw new AppError('NICKNAME_INVALID');
+    if (check.value === p.nickname) return { nickname: p.nickname };
+    const key = nicknameKey(check.value);
+    if (this.activeParticipants().some((o) => o.id !== pid && o.key === key)) throw new AppError('NICKNAME_TAKEN');
+    try {
+      this.deps.db.run('UPDATE participants SET nickname = ?, nickname_key = ? WHERE id = ?', check.value, key, pid);
+    } catch {
+      throw new AppError('NICKNAME_TAKEN');
+    }
+    p.nickname = check.value;
+    p.key = key;
+    // Listeners only understand add/remove: replace the entry so every roster view updates.
+    this.rosterAdded = this.rosterAdded.filter((r) => r.id !== pid);
+    this.rosterAdded.push({ id: pid, nickname: p.nickname });
+    if (!this.rosterRemoved.includes(pid)) this.rosterRemoved.push(pid);
+    this.scheduleRoster();
+    return { nickname: p.nickname };
+  }
+
   hasParticipant(pid: number): boolean {
     const p = this.participants.get(pid);
     return !!p && !p.kicked;
