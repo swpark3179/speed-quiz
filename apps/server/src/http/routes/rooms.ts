@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppContext } from '../../context';
 import { requireAdmin } from '../../auth/plugin';
 import { baseUrlFor, lanAddresses } from '../../config';
+import { renderReport } from '../../services/report-html';
 import { idParam, parse } from '../validate';
 
 export function requestOrigin(req: FastifyRequest): string | null {
@@ -58,6 +59,17 @@ export function roomRoutes(app: FastifyInstance, ctx: AppContext): void {
       .header('content-type', 'text/csv; charset=utf-8')
       .header('content-disposition', `attachment; filename="results.csv"; filename*=UTF-8''${encodeURIComponent(filename)}`);
     return csv;
+  });
+
+  app.get('/api/admin/rooms/:id/report.html', { preHandler: requireAdmin }, async (req, reply) => {
+    const roomId = owned(req);
+    const data = results.reportData(roomId);
+    const filename = `${data.room.title.replace(/[\\/:*?"<>|]/g, '_')}_리포트.html`;
+    reply
+      .header('content-type', 'text/html; charset=utf-8')
+      .header('cache-control', 'no-store')
+      .header('content-disposition', `attachment; filename="report.html"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    return renderReport(data);
   });
 
   app.get('/api/admin/server-info', { preHandler: requireAdmin }, async (req) => ({

@@ -1,6 +1,7 @@
 import { AppError, RoomSettings, rankRows, type Phase, type QuestionKind, type RoomResultsDto } from '@sq/shared';
 import type { Db } from '../db/driver';
 import { previewText } from '../game/projections';
+import type { ReportData } from './report-html';
 
 function csvCell(v: unknown): string {
   const s = v === null || v === undefined ? '' : String(v);
@@ -168,5 +169,71 @@ export class ResultsService {
         x.points,
       ]),
     ]);
+  }
+
+  /** Everything the downloadable HTML report needs. Only for finished rooms. */
+  reportData(roomId: number): ReportData {
+    const r = this.results(roomId);
+    if (r.room.phase !== 'ENDED') throw new AppError('INVALID_TRANSITION', '퀴즈가 끝난 뒤에 리포트를 받을 수 있어요.');
+    const bodies = new Map(
+      this.db
+        .all<{ position: number; kind: QuestionKind; body: string }>(
+          'SELECT position, kind, body FROM room_questions WHERE room_id = ?',
+          roomId,
+        )
+        .map((q) => [q.position, q]),
+    );
+    const fastestRows = this.db.all<{ position: number; nickname: string; elapsed_ms: number }>(
+      `SELECT q.position, p.nickname, a.elapsed_ms
+       FROM answers a
+       JOIN room_questions q ON q.id = a.room_question_id
+       JOIN participants p ON p.id = a.participant_id
+       WHERE q.room_id = ? AND a.is_correct = 1 AND p.kicked_at IS NULL
+       ORDER BY q.position, a.elapsed_ms, a.seq`,
+      roomId,
+    );
+    const fastest = new Map<number, { nickname: string; elapsedMs: number }>();
+    for (const f of fastestRows) if (!fastest.has(f.position)) fastest.set(f.position, { nickname: f.nickname, elapsedMs: f.elapsed_ms });
+
+    const participantCount = r.ranking.length;
+    const closed = r.questions.filter((q) => q.closed);
+    const totalCorrect = closed.reduce((n, q) => n + q.correctCount, 0);
+    const timed = r.ranking.filter((x) => x.avgCorrectMs !== null && x.correctCount > 0);
+    const correctSum = timed.reduce((n, x) => n + x.correctCount, 0);
+    const avgCorrectMs = correctSum
+      ? Math.round(timed.reduce((n, x) => n + (x.avgCorrectMs as number) * x.correctCount, 0) / correctSum)
+      : null;
+
+    return {
+      room: { title: r.room.title, startedAt: r.room.startedAt, finishedAt: r.room.finishedAt, prizeCount: r.room.prizeCount },
+      generatedAt: Date.now(),
+      participantCount,
+      questionCount: r.questions.length,
+      avgCorrectRate: participantCount && closed.length ? totalCorrect / (participantCount * closed.length) : 0,
+      avgCorrectMs,
+      ranking: r.ranking.map((x) => ({
+        rank: x.rank,
+        nickname: x.nickname,
+        score: x.score,
+        correctCount: x.correctCount,
+        avgCorrectMs: x.avgCorrectMs,
+        isWinner: x.isWinner,
+      })),
+      questions: r.questions.map((q) => {
+        const src = bodies.get(q.index);
+        return {
+          index: q.index,
+          title: q.title,
+          text: src ? previewText(src.kind, src.body, 200) : q.preview,
+          kind: q.kind,
+          participantCount,
+          answeredCount: q.answeredCount,
+          correctCount: q.correctCount,
+          avgElapsedMs: q.avgElapsedMs,
+          fastest: fastest.get(q.index) ?? null,
+          choices: q.choices.map((c) => ({ position: c.position, text: c.text, isCorrect: c.isCorrect, count: c.count })),
+        };
+      }),
+    };
   }
 }
