@@ -113,3 +113,27 @@ IIS를 쓴다면 ARR + URL Rewrite에 **WebSocket 프로토콜** 기능을 켜�
 
 방이 종료될 때와 매일 한 번 `data/backups/`에 DB 스냅샷이 생성되며 최근 14개를 보관합니다.
 복원은 서버를 멈춘 뒤 원하는 백업 파일을 `data/speed-quiz.db`로 복사하면 됩니다.
+
+## GitHub Actions 자동 배포 (SSH + pm2)
+
+`main`에 push 되면 `.github/workflows/deploy.yml`이 서버에 SSH로 접속해 `scripts/deploy.sh`를 실행합니다
+(`git pull --ff-only` → `pnpm install --frozen-lockfile` → `pnpm build` → `pm2 restart` → `/api/health` 확인).
+
+**서버 사전 조건**: `~/speed-quiz`가 이 저장소의 git clone이고 `origin`으로 pull 가능해야 하며(private이면 deploy key/토큰),
+Node 22.13+, pnpm, pm2가 설치되어 있어야 합니다.
+
+**GitHub 설정** (Settings → Secrets and variables → Actions)
+
+| 종류 | 이름 | 값 |
+|---|---|---|
+| Secret | `SSH_HOST` | 서버 IP |
+| Secret | `SSH_USER` | SSH 로그인 ID |
+| Secret | `SSH_PRIVATE_KEY` | pem 파일 **전체 내용** (`-----BEGIN ...` ~ `END ...` 포함) |
+| Secret | `SSH_PORT` | (선택) 기본 22 |
+| Secret | `SSH_KNOWN_HOSTS` | (권장) `ssh-keyscan -p 22 <IP>` 출력값. 없으면 워크플로가 keyscan으로 대체 |
+| Variable | `PM2_APP` | (선택) `pm2 ls`의 name. 기본 `speed-quiz` |
+
+**방화벽**: GitHub-hosted runner는 IP 대역이 넓고 수시로 바뀌어 IP 허용 목록을 만들기 어렵습니다.
+인바운드 TCP 22(또는 SSH_PORT)를 열고 키 인증만 허용(`PasswordAuthentication no`)하는 방식을 권장합니다.
+서버가 사내망 전용이면 서버에 [self-hosted runner](https://docs.github.com/actions/hosting-your-own-runners)를 설치하고
+워크플로의 `runs-on`을 `self-hosted`로 바꾸세요(아웃바운드 443만 필요, 인바운드 개방 불필요).
