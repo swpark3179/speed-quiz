@@ -14,6 +14,7 @@ const GAME_EVENTS: GameEvent['type'][] = [
   'question:reveal',
   'you:result',
   'leaderboard:show',
+  'standings:update',
   'game:final',
   'prize:reveal',
   'game:ended',

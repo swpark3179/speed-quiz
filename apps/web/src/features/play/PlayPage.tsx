@@ -11,6 +11,7 @@ import { useDocumentTitle, useHtmlAttr, useWakeLock } from '@/hooks/dom';
 import { haptic, HAPTIC } from '@/design/haptics';
 import { screenVariants } from '@/design/motion';
 import { PlayHeader } from './PlayHeader';
+import { StandingsBar } from './StandingsBar';
 import { ConnectionOverlay } from './ConnectionOverlay';
 import { LobbyScreen } from './screens/LobbyScreen';
 import { QuestionScreen, type PendingAnswer } from './screens/QuestionScreen';
@@ -155,6 +156,7 @@ function PlayInner({ code, token, nickname }: { code: string; token: string; nic
   return (
     <div className="no-tap flex h-dvh flex-col overflow-hidden bg-bg">
       <PlayHeader state={state} nickname={nickname} />
+      <StandingsBar state={state} />
       <AnimatePresence mode="popLayout" initial={false}>
         <m.div key={screenKey} className="flex min-h-0 flex-1 flex-col" {...screenVariants}>
           {screen}

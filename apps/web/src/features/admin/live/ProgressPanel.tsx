@@ -1,12 +1,10 @@
-import { useState } from 'react';
 import { m } from 'motion/react';
-import { Check, Eye, EyeOff, Gift, ListOrdered } from 'lucide-react';
+import { Check, Gift, ListOrdered, Users } from 'lucide-react';
 import type { AdminQuestionBrief, AdminSnapshot } from '@sq/shared';
 import { choiceMeta } from '@/design/choices';
 import { spring } from '@/design/motion';
 import { ChoiceShape } from '@/game/ChoiceShape';
 import { CountdownBar } from '@/game/Countdown';
-import { QuestionBody } from '@/game/QuestionBody';
 import { Badge, Card } from '@/ui/display';
 import { cn, num, seconds } from '@/lib/format';
 
@@ -62,23 +60,36 @@ function ChoiceRows({
   );
 }
 
-function MaskToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) {
+/** One dot per question: done / current / upcoming. Purely progress — no question content. */
+function QuestionTrack({ snap }: { snap: AdminSnapshot }) {
+  const cur = snap.room.currentIndex;
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="inline-flex items-center gap-1.5 rounded-full bg-n-100 px-3 py-1.5 text-sm font-bold text-n-700 hover:bg-n-200"
-      aria-pressed={show}
-    >
-      {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-      {show ? '정답 가리기' : '정답 보기'}
-    </button>
+    <ol className="flex flex-wrap gap-1.5" aria-label="문제 진행 현황">
+      {snap.questions.map((q) => {
+        const isCur = q.index === cur;
+        return (
+          <li
+            key={q.roomQuestionId}
+            aria-current={isCur ? 'step' : undefined}
+            className={cn(
+              'tabular flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-xs font-black',
+              isCur ? 'bg-ink text-spark-400' : q.closed ? 'bg-success/15 text-success' : 'bg-n-100 text-n-500',
+            )}
+            title={`Q${q.index + 1}${q.closed ? ' · 완료' : isCur ? ' · 진행 중' : ' · 대기'}`}
+          >
+            {q.closed ? <Check className="size-3.5" strokeWidth={3} aria-label={`Q${q.index + 1} 완료`} /> : q.index + 1}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
-/** Left column main card: what is happening with the current (or next) question / the ceremony. */
-export function QuestionPanel({ snap }: { snap: AdminSnapshot }) {
-  const [showAnswer, setShowAnswer] = useState(false);
+/**
+ * Host's main card. Shows how the game is going (which question, timer, who answered, results once
+ * revealed) — never the upcoming question's text, choices or correct answer.
+ */
+export function ProgressPanel({ snap }: { snap: AdminSnapshot }) {
   const { room } = snap;
   const phase = room.phase;
 
@@ -124,28 +135,47 @@ export function QuestionPanel({ snap }: { snap: AdminSnapshot }) {
   }
 
   const cur = snap.current;
+  const active = phase === 'QUESTION_ACTIVE';
+  const revealed = phase === 'QUESTION_REVEAL' || phase === 'LEADERBOARD';
+  // Meta only (time limit, multiplier) for the question in play, or the one that starts next.
   const brief = cur ? snap.questions[cur.question.index] : snap.questions[room.currentIndex + 1];
-  if (!brief) {
+  const online = snap.participants.filter((p) => p.connected).length;
+
+  if (phase === 'LOBBY' || !brief) {
     return (
-      <Card className="p-6">
-        <p className="text-fg-muted">표시할 문제가 없어요.</p>
+      <Card className="flex flex-col gap-4 p-5 md:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-lg font-extrabold">
+            <Users className="size-5" aria-hidden="true" /> 대기실
+          </h2>
+          <Badge tone="info">시작 전</Badge>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <span className="tabular text-5xl font-black">{num(online)}</span>
+          <span className="text-xl font-bold text-fg-muted">명 대기 중</span>
+          <span className="ml-auto text-sm font-semibold text-fg-muted">총 {num(snap.participants.length)}명 입장</span>
+        </div>
+        <QuestionTrack snap={snap} />
+        <p className="text-sm text-fg-muted">
+          총 {room.total}문제 · 준비되면 아래 <b>시작</b> 버튼으로 첫 문제를 내세요. 문제 내용은 참가자 화면과 진행 화면(PC)에서만 보여요.
+        </p>
       </Card>
     );
   }
-  const active = phase === 'QUESTION_ACTIVE';
-  const revealed = phase === 'QUESTION_REVEAL' || phase === 'LEADERBOARD';
-  const dist = active ? snap.live?.distribution : revealed ? snap.reveal?.distribution : undefined;
+
+  const dist = active ? null : revealed ? snap.reveal?.distribution : undefined;
   const counts = dist ? new Map(dist.map((d) => [d.choiceId, d.count])) : null;
-  const next = revealed || active ? snap.questions[room.currentIndex + 1] : undefined;
+  const rv = snap.reveal;
+  const rate = rv && rv.answeredCount > 0 ? Math.round((rv.correctCount / rv.answeredCount) * 100) : 0;
 
   return (
-    <Card className="p-5 md:p-6">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+    <Card className="flex flex-col gap-4 p-5 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-ink px-3 py-1 text-sm font-black text-spark-400">
             Q{brief.index + 1} / {room.total}
           </span>
-          {!cur && <Badge tone="info">다음 출제 문제</Badge>}
+          {!cur && <Badge tone="info">다음 출제</Badge>}
           {active && (
             <Badge tone="success" dot pulse>
               응답 받는 중
@@ -156,30 +186,46 @@ export function QuestionPanel({ snap }: { snap: AdminSnapshot }) {
             제한시간 {Math.round(brief.timeLimitMs / 1000)}초{brief.multiplier !== 1 && ` · 점수 ×${brief.multiplier}`}
           </span>
         </div>
-        {!revealed && <MaskToggle show={showAnswer} onToggle={() => setShowAnswer((v) => !v)} />}
       </div>
-      {active && cur && <CountdownBar opensAt={cur.timing.opensAt} endsAt={cur.timing.endsAt} className="mb-4" />}
-      <div className="mb-4 max-h-56 overflow-y-auto rounded-md bg-n-25 px-4 py-3 ring-1 ring-line/50">
-        {cur ? (
-          <QuestionBody kind={cur.question.kind} body={cur.question.body} imageUrl={cur.question.imageUrl} variant="preview" />
-        ) : (
-          <p className="text-center text-lg font-semibold">{brief.title || brief.preview}</p>
-        )}
-      </div>
-      <ChoiceRows choices={brief.choices} counts={counts} showCorrect={revealed || showAnswer} />
-      {revealed && snap.reveal && (
-        <p className="mt-3 text-sm font-semibold text-fg-muted">
-          정답 {num(snap.reveal.correctCount)}명 / 응답 {num(snap.reveal.answeredCount)}명
-          {snap.reveal.fastest[0] && ` · 최고 기록 ${snap.reveal.fastest[0].nickname} ${seconds(snap.reveal.fastest[0].elapsedMs, 2)}`}
-        </p>
+      <QuestionTrack snap={snap} />
+      {active && cur && <CountdownBar opensAt={cur.timing.opensAt} endsAt={cur.timing.endsAt} />}
+      {revealed && rv && (
+        <>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <Stat label="정답률" value={`${rate}%`} />
+            <Stat label="정답" value={`${num(rv.correctCount)}명`} />
+            <Stat label="응답" value={`${num(rv.answeredCount)}/${num(rv.activeCount)}`} />
+          </div>
+          <ChoiceRows choices={brief.choices} counts={counts} showCorrect />
+          {rv.fastest[0] && (
+            <p className="text-sm font-semibold text-fg-muted">
+              최고 기록 {rv.fastest[0].nickname} {seconds(rv.fastest[0].elapsedMs, 2)}
+            </p>
+          )}
+        </>
       )}
-      {next && (
-        <p className="mt-3 flex items-center gap-2 border-t border-line pt-3 text-sm text-fg-muted">
+      {!revealed && !active && (
+        <p className="text-sm text-fg-muted">시작 버튼을 누르면 이 문제가 참가자 화면과 진행 화면(PC)에 나가요.</p>
+      )}
+      {(revealed || active) && snap.questions[room.currentIndex + 1] && (
+        <p className="flex items-center gap-2 border-t border-line pt-3 text-sm text-fg-muted">
           <ListOrdered className="size-4 shrink-0" aria-hidden="true" />
           <span className="font-bold">다음 문제</span>
-          <span className="min-w-0 truncate">{next.title || next.preview}</span>
+          <span>
+            Q{room.currentIndex + 2}
+            {snap.questions[room.currentIndex + 1]!.multiplier !== 1 && ` · 점수 ×${snap.questions[room.currentIndex + 1]!.multiplier}`}
+          </span>
         </p>
       )}
     </Card>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-n-50 px-2 py-2.5 ring-1 ring-line/60">
+      <p className="text-xs font-bold text-fg-muted">{label}</p>
+      <p className="tabular text-xl font-black">{value}</p>
+    </div>
   );
 }

@@ -104,6 +104,22 @@ export interface LeaderboardPayload extends Ver {
   top: LeaderboardEntry[];
 }
 
+/** Always-visible mini ranking on phones (top N after each closed question). */
+export const STANDINGS_SIZE = 5;
+
+export interface StandingEntry {
+  participantId: number;
+  nickname: string;
+  score: number;
+  rank: number;
+}
+
+export interface StandingsPayload extends Ver {
+  top: StandingEntry[];
+  /** number of ranked participants */
+  total: number;
+}
+
 export interface FinalResultsPayload extends Ver {
   /** number of prize winners that will be revealed in the ceremony */
   winnerCount: number;
@@ -172,6 +188,8 @@ export interface PlaySnapshot extends Ver {
   reveal: RevealPayload | null;
   you: YouResult | null;
   leaderboard: LeaderboardPayload | null;
+  /** null before the first question closes, when the host hides rankings, and during the ceremony */
+  standings: (StandingsPayload & { myRank: number | null }) | null;
   final: FinalResultsPayload | null;
   prizes: PrizeRevealPayload[];
   ended: GameEndedPayload | null;
@@ -273,6 +291,7 @@ export interface PlayServerToClient {
   'question:reveal': (p: RevealPayload) => void;
   'you:result': (p: YouResult) => void;
   'leaderboard:show': (p: LeaderboardPayload) => void;
+  'standings:update': (p: StandingsPayload) => void;
   'game:final': (p: FinalResultsPayload) => void;
   'prize:reveal': (p: PrizeRevealPayload) => void;
   'game:ended': (p: GameEndedPayload) => void;

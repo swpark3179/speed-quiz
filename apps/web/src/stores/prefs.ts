@@ -6,6 +6,8 @@ interface Prefs {
   haptics: boolean;
   reduceMotion: boolean;
   stageTheme: 'light' | 'stage';
+  /** phone: mini ranking strip expanded */
+  standingsOpen: boolean;
   set: (p: Partial<Omit<Prefs, 'set'>>) => void;
 }
 
@@ -25,6 +27,7 @@ export const usePrefs = create<Prefs>((set, get) => ({
   haptics: true,
   reduceMotion: false,
   stageTheme: 'light',
+  standingsOpen: true,
   ...load(),
   set: (p) => {
     set(p);
