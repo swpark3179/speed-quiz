@@ -7,6 +7,7 @@ import {
   availableActions,
   ceremonyKind,
   nextPrizeRank,
+  STANDINGS_SIZE,
   nicknameKey,
   primaryAction,
   rankRows,
@@ -33,6 +34,7 @@ import {
   type RoomPublicInfo,
   type RosterEntry,
   type ScreenSnapshot,
+  type StandingsPayload,
   type ScreenView,
   type YouFinal,
   type YouResult,
@@ -838,7 +840,29 @@ export class RoomEngine {
     this.deps.bus.play(this.id, 'question:reveal', this.lastReveal);
     this.deps.bus.screen(this.id, 'question:reveal', this.lastReveal);
     for (const [pid, r] of this.lastResults) this.deps.bus.player(pid, 'you:result', r);
+    const standings = this.buildStandings(now);
+    if (standings) this.deps.bus.play(this.id, 'standings:update', standings);
     this.pushAdminState();
+  }
+
+  /**
+   * Mini ranking shown in a corner of every phone. Built only from *closed* questions, so it never
+   * reveals correctness before the reveal. Hidden when the host turned rankings off.
+   */
+  private buildStandings(at: number): StandingsPayload | null {
+    if (!this.settings.showLeaderboardAfterEach || this.lastClosedIndex() < 0) return null;
+    const ranking = this.currentRanking();
+    return {
+      v: this.v,
+      at,
+      total: ranking.length,
+      top: ranking.slice(0, STANDINGS_SIZE).map((r) => ({
+        participantId: r.pid,
+        nickname: this.participants.get(r.pid)!.nickname,
+        score: r.score,
+        rank: r.rank,
+      })),
+    };
   }
 
   private buildRevealState(index: number, at: number): void {
@@ -1159,6 +1183,7 @@ export class RoomEngine {
     const cur = this.currentState(true);
     const inReveal = this.phase === 'QUESTION_REVEAL' || this.phase === 'LEADERBOARD';
     const ceremony = this.phase === 'FINAL_RESULTS' || this.phase === 'PRIZE_REVEAL' || this.phase === 'ENDED';
+    const standings = this.currentState(true) ? this.buildStandings(this.lastReveal?.at ?? this.now()) : null;
     return {
       v: this.v,
       at: this.now(),
@@ -1170,6 +1195,7 @@ export class RoomEngine {
       reveal: inReveal ? this.lastReveal : null,
       you: inReveal ? (this.lastResults.get(pid) ?? null) : null,
       leaderboard: this.phase === 'LEADERBOARD' ? this.lastLeaderboard : null,
+      standings: standings ? { ...standings, myRank: this.currentRanking().find((r) => r.pid === pid)?.rank ?? null } : null,
       final: ceremony && this.finalPayload ? { ...this.finalPayload, ranksBeyondPrize: [] } : null,
       prizes: ceremony ? this.prizes : [],
       ended: this.phase === 'ENDED' ? this.ended : null,

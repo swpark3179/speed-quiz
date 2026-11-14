@@ -6,7 +6,7 @@ import { useDocumentTitle, useWakeLock } from '@/hooks/dom';
 import { Logo, Spinner } from '@/ui/display';
 import { useAdminLive } from './useAdminLive';
 import { PhaseStepper } from './PhaseStepper';
-import { QuestionPanel } from './QuestionPanel';
+import { ProgressPanel } from './ProgressPanel';
 import { RecentFeed, ResponseMeter } from './StatsPanels';
 import { ParticipantsPanel } from './ParticipantsPanel';
 import { JoinCard } from './JoinCard';
@@ -88,7 +88,7 @@ export default function LivePage() {
 
       <main className="mx-auto grid max-w-[1600px] gap-5 px-4 py-5 md:px-6 lg:grid-cols-3 lg:gap-6">
         <section className="flex min-w-0 flex-col gap-5 lg:col-span-2">
-          <QuestionPanel snap={snap} />
+          <ProgressPanel snap={snap} />
           {(phase === 'LOBBY' || phase === 'QUESTION_ACTIVE' || phase === 'QUESTION_REVEAL' || phase === 'LEADERBOARD') && (
             <div className="grid gap-5 md:grid-cols-2">
               <ResponseMeter snap={snap} />

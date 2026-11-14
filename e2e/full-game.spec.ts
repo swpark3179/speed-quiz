@@ -117,9 +117,16 @@ test('full game: phones join, answer, see results and the ceremony; presenter fo
   await expect(phones[1]!.getByText('땡!', { exact: true })).toBeVisible();
   await expect(phones[0]!.getByText('+1,000')).toBeVisible();
 
+  // Corner ranking appears once the reveal animation has settled, with my own rank; survives a reload
+  const rank = phones[0]!.getByRole('region', { name: '현재 순위' });
+  await expect(rank).toBeVisible({ timeout: 10_000 });
+  await expect(rank).toContainText('내 순위 1위');
+  await expect(rank).toContainText('가나다');
+
   // Reload after answering keeps identity (no re-join)
   await phones[1]!.reload();
   await expect(phones[1]!).toHaveURL(new RegExp(`/play/${code}`));
+  await expect(phones[1]!.getByRole('region', { name: '현재 순위' })).toBeVisible({ timeout: 10_000 });
 
   await control({ type: 'SHOW_LEADERBOARD', index: 0 });
   await expect(presenter.getByText('가나다').first()).toBeVisible();
@@ -132,6 +139,8 @@ test('full game: phones join, answer, see results and the ceremony; presenter fo
   const fin = await control({ type: 'FINISH' });
   expect(fin.winners.map((w) => w.rank)).toEqual([1, 2]);
   await expect(phones[0]!.getByText('결과 발표 중')).toBeVisible();
+  // the ranking strip must not spoil the prize ceremony
+  await expect(phones[0]!.getByRole('region', { name: '현재 순위' })).toHaveCount(0);
   await control({ type: 'REVEAL_PRIZE', rank: 2 });
   await control({ type: 'REVEAL_PRIZE', rank: 1 });
   await expect(phones[0]!.getByText('1등 수상!', { exact: true })).toBeVisible({ timeout: 15_000 });

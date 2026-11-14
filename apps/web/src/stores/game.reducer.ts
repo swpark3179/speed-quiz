@@ -13,9 +13,12 @@ import type {
   RosterEntry,
   ScreenSnapshot,
   ScreenView,
+  StandingsPayload,
   YouFinal,
   YouResult,
 } from '@sq/shared';
+
+export type GameStandings = StandingsPayload & { myRank: number | null };
 
 /** Client-side game state shared by the participant (/play) and presenter (/screen) views. */
 export interface GameState {
@@ -30,6 +33,8 @@ export interface GameState {
   reveal: RevealPayload | null;
   you: YouResult | null;
   leaderboard: LeaderboardPayload | null;
+  /** phone-only mini ranking; survives question start so the corner widget never blanks */
+  standings: GameStandings | null;
   final: FinalResultsPayload | null;
   prizes: PrizeRevealPayload[];
   ended: GameEndedPayload | null;
@@ -50,6 +55,7 @@ export const initialGame: GameState = {
   reveal: null,
   you: null,
   leaderboard: null,
+  standings: null,
   final: null,
   prizes: [],
   ended: null,
@@ -66,6 +72,7 @@ export type GameEvent =
   | { type: 'question:reveal'; payload: RevealPayload }
   | { type: 'you:result'; payload: YouResult }
   | { type: 'leaderboard:show'; payload: LeaderboardPayload }
+  | { type: 'standings:update'; payload: StandingsPayload }
   | { type: 'game:final'; payload: FinalResultsPayload }
   | { type: 'prize:reveal'; payload: PrizeRevealPayload }
   | { type: 'game:ended'; payload: GameEndedPayload }
@@ -104,6 +111,7 @@ export function gameReducer(s: GameState, e: GameEvent): GameState {
         reveal: p.reveal,
         you: isPlay ? (p as PlaySnapshot).you : null,
         leaderboard: p.leaderboard,
+        standings: isPlay ? ((p as PlaySnapshot).standings ?? null) : null,
         final: p.final,
         prizes: p.prizes,
         ended: p.ended,
@@ -166,7 +174,14 @@ export function gameReducer(s: GameState, e: GameEvent): GameState {
         ...s,
         you: e.payload,
         me: s.me ? { ...s.me, score: e.payload.totalScore, streak: e.payload.streak } : s.me,
+        standings: s.standings ? { ...s.standings, myRank: e.payload.rank } : s.standings,
       };
+    }
+    case 'standings:update': {
+      // Not version-gated: it is derived data and always follows the reveal that produced it.
+      if (s.standings && e.payload.at < s.standings.at) return s;
+      // `you:result` (my rank) may land before or after this event, so take it from either place.
+      return { ...s, standings: { ...e.payload, myRank: s.you?.rank ?? s.standings?.myRank ?? null } };
     }
     case 'leaderboard:show': {
       const g = gate(s, e.payload.v);
@@ -176,7 +191,7 @@ export function gameReducer(s: GameState, e: GameEvent): GameState {
     case 'game:final': {
       const g = gate(s, e.payload.v);
       if (g === 'stale') return s;
-      return { ...s, v: e.payload.v, at: e.payload.at, needsResync: g === 'gap', room: withPhase(s, 'FINAL_RESULTS'), final: e.payload };
+      return { ...s, v: e.payload.v, at: e.payload.at, needsResync: g === 'gap', room: withPhase(s, 'FINAL_RESULTS'), final: e.payload, standings: null };
     }
     case 'prize:reveal': {
       const g = gate(s, e.payload.v);

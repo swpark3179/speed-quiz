@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PlaySnapshot, QuestionStartPayload, RevealPayload } from '@sq/shared';
+import type { PlaySnapshot, QuestionStartPayload, RevealPayload, StandingsPayload, YouResult } from '@sq/shared';
 import { gameReducer, initialGame } from './game.reducer';
 import { ServerClock } from '../lib/clock';
 
@@ -25,6 +25,7 @@ const snap: PlaySnapshot = {
   reveal: null,
   you: null,
   leaderboard: null,
+  standings: null,
   final: null,
   prizes: [],
   ended: null,
@@ -60,6 +61,44 @@ describe('gameReducer', () => {
     let s = gameReducer(initialGame, { type: 'state:sync', payload: snap });
     s = gameReducer(s, { type: 'question:start', payload: { ...start, v: 9 } });
     expect(s.needsResync).toBe(true);
+  });
+});
+
+describe('standings', () => {
+  const st: StandingsPayload = {
+    v: 5,
+    at: 3000,
+    total: 3,
+    top: [
+      { participantId: 8, nickname: '너', score: 900, rank: 1 },
+      { participantId: 7, nickname: '나', score: 500, rank: 2 },
+    ],
+  };
+
+  it('picks up my rank when you:result arrives before the standings (server order)', () => {
+    let s = gameReducer(initialGame, { type: 'state:sync', payload: snap });
+    s = gameReducer(s, { type: 'you:result', payload: { totalScore: 500, streak: 1, rank: 2, total: 3 } as YouResult });
+    s = gameReducer(s, { type: 'standings:update', payload: st });
+    expect(s.standings?.myRank).toBe(2);
+  });
+
+  it('keeps standings across the next question start, tracks my rank, drops them for the ceremony', () => {
+    let s = gameReducer(initialGame, { type: 'state:sync', payload: snap });
+    expect(s.standings).toBeNull();
+    s = gameReducer(s, { type: 'standings:update', payload: st });
+    s = gameReducer(s, { type: 'you:result', payload: { totalScore: 500, streak: 1, rank: 2, total: 3 } as YouResult });
+    expect(s.standings?.myRank).toBe(2);
+    // a newer update keeps my rank until the next you:result arrives
+    s = gameReducer(s, { type: 'standings:update', payload: { ...st, at: 4000 } });
+    expect(s.standings?.myRank).toBe(2);
+    // next question must not blank the corner widget
+    s = gameReducer(s, { type: 'question:start', payload: { ...start, v: 4 } });
+    expect(s.standings?.top).toHaveLength(2);
+    // an out-of-order (older) update is ignored
+    const kept = s;
+    expect(gameReducer(s, { type: 'standings:update', payload: { ...st, at: 1 } })).toBe(kept);
+    s = gameReducer(s, { type: 'game:final', payload: { v: 5, at: 5000, winnerCount: 1, totalParticipants: 3, ranksBeyondPrize: [], stats: { questions: 1, avgCorrectRate: 0 } } });
+    expect(s.standings).toBeNull();
   });
 });
 

@@ -8,6 +8,7 @@ import type {
   PrizeRevealPayload,
   QuestionStartPayload,
   RevealPayload,
+  StandingsPayload,
   YouResult,
 } from '@sq/shared';
 import { CEREMONY_TIMING } from '@sq/shared';
@@ -126,6 +127,65 @@ describe('RoomEngine', () => {
     expect(serialized).not.toMatch(/isCorrect|correctChoiceIds|"correct"/);
     engine.closeQuestion(c.rqId, 'MANUAL');
     expect(JSON.stringify(w.bus.last('question:reveal', 'play')!.payload)).toMatch(/correctChoiceIds/);
+  });
+
+  it('sends a top-N standings only after a question closes, scoped to the room, and hides it when rankings are off', () => {
+    const w = setupWorld();
+    const q1 = makeQuestion(w, {}, 1);
+    const q2 = makeQuestion(w, {}, 0);
+    const { engine } = makeRoom(w, [q1.id, q2.id], { prizeCount: 1 });
+    const ids = join(w, engine, ['가', '나', '다', '라', '마', '바', '사']);
+    expect(engine.playSnapshot(ids[0]!).standings).toBeNull();
+
+    openQuestion(w, engine, 0);
+    const c = correctChoice(engine, 0);
+    // before any question closed: nothing to rank, and nothing leaks during the question
+    expect(w.bus.of('standings:update')).toHaveLength(0);
+    engine.submitAnswer(ids[0]!, c.rqId, c.correct);
+    w.scheduler.advance(10);
+    engine.submitAnswer(ids[1]!, c.rqId, c.wrong);
+    expect(engine.playSnapshot(ids[0]!).standings).toBeNull();
+    engine.closeQuestion(c.rqId, 'MANUAL');
+
+    const ev = w.bus.last('standings:update', 'play')!.payload as StandingsPayload;
+    expect(ev.top).toHaveLength(5); // STANDINGS_SIZE
+    expect(ev.total).toBe(7);
+    expect(ev.top[0]).toMatchObject({ participantId: ids[0], rank: 1 });
+    expect(ev.top[0]!.score).toBeGreaterThan(0);
+    // one broadcast to the room, never to the projector
+    expect(w.bus.of('standings:update')).toHaveLength(1);
+    expect(w.bus.of('standings:update', 'screen')).toHaveLength(0);
+    // no correctness in the payload
+    expect(JSON.stringify(ev)).not.toMatch(/correct|isCorrect/i);
+
+    // reconnecting phones get it from the snapshot, with their own rank (also when outside the top N)
+    expect(engine.playSnapshot(ids[0]!).standings?.myRank).toBe(1);
+    const outside = engine.playSnapshot(ids[6]!).standings!;
+    expect(outside.top.some((e) => e.participantId === ids[6])).toBe(false);
+    expect(outside.myRank).toBeGreaterThan(5);
+
+    // still shown while the next question is running; gone for the ceremony
+    engine.showLeaderboard(0);
+    openQuestion(w, engine, 1);
+    expect(engine.playSnapshot(ids[0]!).standings).not.toBeNull();
+    const c2 = correctChoice(engine, 1);
+    engine.closeQuestion(c2.rqId, 'MANUAL');
+    expect(engine.playSnapshot(ids[0]!).standings).not.toBeNull();
+    engine.finish();
+    expect(engine.playSnapshot(ids[0]!).standings).toBeNull();
+  });
+
+  it('does not expose standings when the host hides the leaderboard', () => {
+    const w = setupWorld();
+    const q = makeQuestion(w, {}, 0);
+    const { engine } = makeRoom(w, [q.id], { prizeCount: 1, showLeaderboardAfterEach: false });
+    const [a] = join(w, engine, ['가', '나']);
+    openQuestion(w, engine, 0);
+    const c = correctChoice(engine, 0);
+    engine.submitAnswer(a!, c.rqId, c.correct);
+    engine.closeQuestion(c.rqId, 'MANUAL');
+    expect(w.bus.of('standings:update')).toHaveLength(0);
+    expect(engine.playSnapshot(a!).standings).toBeNull();
   });
 
   it('guards stale / invalid control commands', () => {
