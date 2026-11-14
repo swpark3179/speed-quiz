@@ -32,10 +32,17 @@ export const AdminPatchInput = z.object({
   password: z.string().min(PASSWORD_MIN).max(200).optional(),
 });
 
+export type AdminRole = 'MAIN' | 'ADMIN';
+
+export const ProfilePatchInput = z.object({
+  displayName: z.string().trim().min(1, '이름을 입력해 주세요.').max(40),
+});
+
 export interface AdminDto {
   id: number;
   username: string;
   displayName: string;
+  role: AdminRole;
   disabled: boolean;
   createdAt: number;
   lastLoginAt: number | null;

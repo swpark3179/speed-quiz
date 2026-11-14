@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, Copy, ImagePlus, Save, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Copy, Globe, ImagePlus, Lock, Save, Trash2, X } from 'lucide-react';
 import { QuestionInput, type QuestionDto, type QuestionKind } from '@sq/shared';
 import { errorText, uploadImage } from '@/lib/api';
 import { cn } from '@/lib/format';
@@ -24,6 +24,7 @@ interface Draft {
   timeLimitSec: number | null;
   explanation: string;
   tags: string[];
+  isPublic: boolean;
   choices: ChoiceDraft[];
 }
 
@@ -38,6 +39,7 @@ function emptyDraft(): Draft {
     timeLimitSec: null,
     explanation: '',
     tags: [],
+    isPublic: false,
     choices: Array.from({ length: 4 }, (_, i) => ({ key: newChoiceKey(), text: '', isCorrect: i === 0 })),
   };
 }
@@ -51,6 +53,7 @@ function fromDto(q: QuestionDto): Draft {
     timeLimitSec: q.timeLimitSec,
     explanation: q.explanation ?? '',
     tags: q.tags,
+    isPublic: q.isPublic,
     choices: q.choices.map((c) => ({ key: newChoiceKey(), text: c.text, isCorrect: c.isCorrect })),
   };
 }
@@ -64,6 +67,7 @@ function toInput(d: Draft) {
     timeLimitSec: d.timeLimitSec,
     explanation: d.explanation.trim() ? d.explanation : null,
     tags: d.tags,
+    isPublic: d.isPublic,
     choices: d.choices.map((c) => ({ text: c.text, isCorrect: c.isCorrect })),
   };
 }
@@ -74,7 +78,7 @@ export default function QuestionEditPage() {
   const params = useParams();
   const id = params.id ? Number(params.id) : null;
   const isNew = id === null;
-  useDocumentTitle(isNew ? '새 문제' : '문제 수정');
+  useDocumentTitle(isNew ? '새 문제' : '문제');
   const navigate = useNavigate();
   const query = useQuestion(id);
   const save = useSaveQuestion();
@@ -102,7 +106,9 @@ export default function QuestionEditPage() {
     }
   }, [query.data, loadedId]);
 
-  const dirty = fingerprint(draft) !== initial;
+  /** Someone else's public question: viewable and duplicable, never editable. */
+  const readOnly = !isNew && query.data?.mine === false;
+  const dirty = !readOnly && fingerprint(draft) !== initial;
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) => dirty && !allowLeave.current && currentLocation.pathname !== nextLocation.pathname,
   );
@@ -182,7 +188,7 @@ export default function QuestionEditPage() {
             <ArrowLeft className="size-4" /> 문제은행
           </Link>
         }
-        title={isNew ? '새 문제 만들기' : '문제 수정'}
+        title={isNew ? '새 문제 만들기' : readOnly ? '문제 보기' : '문제 수정'}
         actions={
           <>
             {!isNew && (
@@ -194,7 +200,7 @@ export default function QuestionEditPage() {
                   onClick={async () => {
                     try {
                       const q = await dup.mutateAsync(id!);
-                      toast.success('복제했어요. 복사본을 편집하고 있어요.');
+                      toast.success(readOnly ? '내 문제로 복제했어요. 복사본을 편집하고 있어요. (비공개)' : '복제했어요. 복사본을 편집하고 있어요.');
                       allowLeave.current = true;
                       navigate(`/admin/questions/${q.id}`);
                       allowLeave.current = false;
@@ -205,17 +211,30 @@ export default function QuestionEditPage() {
                 >
                   복제
                 </Button>
-                <Button variant="ghost" icon={<Trash2 className="size-4" />} onClick={() => setConfirmDelete(true)}>
-                  삭제
-                </Button>
+                {!readOnly && (
+                  <Button variant="ghost" icon={<Trash2 className="size-4" />} onClick={() => setConfirmDelete(true)}>
+                    삭제
+                  </Button>
+                )}
               </>
             )}
-            <Button icon={<Save className="size-5" />} loading={save.isPending} onClick={submit}>
-              저장
-            </Button>
+            {!readOnly && (
+              <Button icon={<Save className="size-5" />} loading={save.isPending} onClick={submit}>
+                저장
+              </Button>
+            )}
           </>
         }
       />
+
+      {readOnly && (
+        <p className="mb-4 flex items-start gap-2 rounded-md bg-info-tint px-4 py-3 text-sm font-semibold text-info-dark">
+          <Globe className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>
+            {query.data?.ownerName ?? '다른 관리자'}님이 공개한 문제예요. 수정할 수 없고, <b>복제</b>하면 내 문제(비공개)로 가져와 편집할 수 있어요.
+          </span>
+        </p>
+      )}
 
       <Segmented
         label="편집 / 미리보기"
@@ -231,6 +250,7 @@ export default function QuestionEditPage() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,55fr)_minmax(0,45fr)]">
         <form
           className={cn('flex flex-col gap-6', tab !== 'edit' && 'hidden lg:flex')}
+          inert={readOnly}
           onSubmit={(e) => {
             e.preventDefault();
             void submit();
@@ -333,6 +353,26 @@ export default function QuestionEditPage() {
           </section>
 
           <section className="grid gap-5 rounded-lg bg-surface p-5 shadow-sm ring-1 ring-line/60 md:p-6">
+            <div className="flex flex-col gap-1.5">
+              <span className="flex items-center gap-1.5 text-sm font-bold">
+                {draft.isPublic ? <Globe className="size-4" aria-hidden="true" /> : <Lock className="size-4" aria-hidden="true" />}
+                공개 범위
+              </span>
+              <Segmented
+                label="공개 범위"
+                value={draft.isPublic ? 'public' : 'private'}
+                onChange={(v) => set('isPublic', v === 'public')}
+                options={[
+                  { value: 'private', label: '비공개' },
+                  { value: 'public', label: '공개' },
+                ]}
+              />
+              <p className="text-xs font-semibold text-fg-muted">
+                {draft.isPublic
+                  ? '다른 관리자가 문제은행에서 보고 퀴즈방에 쓸 수 있어요. 수정은 나만 할 수 있어요.'
+                  : '나만 볼 수 있어요. 다른 관리자의 문제은행과 퀴즈방 문제 선택에는 나타나지 않아요.'}
+              </p>
+            </div>
             <Select
               label="제한시간"
               value={draft.timeLimitSec ?? ''}
@@ -358,11 +398,13 @@ export default function QuestionEditPage() {
             />
           </section>
 
-          <div className="sticky bottom-20 z-10 flex justify-end md:bottom-4">
-            <Button type="submit" size="lg" icon={<Save className="size-5" />} loading={save.isPending} className="shadow-lg">
-              {isNew ? '문제 만들기' : '변경 내용 저장'}
-            </Button>
-          </div>
+          {!readOnly && (
+            <div className="sticky bottom-20 z-10 flex justify-end md:bottom-4">
+              <Button type="submit" size="lg" icon={<Save className="size-5" />} loading={save.isPending} className="shadow-lg">
+                {isNew ? '문제 만들기' : '변경 내용 저장'}
+              </Button>
+            </div>
+          )}
         </form>
 
         <aside className={cn('flex min-w-0 flex-col gap-4 lg:sticky lg:top-8 lg:self-start', tab !== 'preview' && 'hidden lg:flex')}>

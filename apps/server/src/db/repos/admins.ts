@@ -1,4 +1,4 @@
-import type { AdminDto } from '@sq/shared';
+import type { AdminDto, AdminRole } from '@sq/shared';
 import type { Db } from '../driver';
 
 export interface AdminRow {
@@ -6,6 +6,7 @@ export interface AdminRow {
   username: string;
   display_name: string;
   password_hash: string;
+  role: AdminRole;
   disabled: number;
   created_at: number;
   last_login_at: number | null;
@@ -16,6 +17,7 @@ export function toAdminDto(r: AdminRow): AdminDto {
     id: r.id,
     username: r.username,
     displayName: r.display_name,
+    role: r.role,
     disabled: !!r.disabled,
     createdAt: r.created_at,
     lastLoginAt: r.last_login_at,
@@ -35,12 +37,13 @@ export const adminsRepo = {
   list(db: Db): AdminRow[] {
     return db.all<AdminRow>('SELECT * FROM admins ORDER BY id');
   },
-  insert(db: Db, a: { username: string; displayName: string; passwordHash: string }): number {
+  insert(db: Db, a: { username: string; displayName: string; passwordHash: string; role?: AdminRole }): number {
     return db.run(
-      'INSERT INTO admins (username, display_name, password_hash, created_at) VALUES (?, ?, ?, ?)',
+      'INSERT INTO admins (username, display_name, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)',
       a.username,
       a.displayName,
       a.passwordHash,
+      a.role ?? 'ADMIN',
       Date.now(),
     ).lastInsertRowid;
   },

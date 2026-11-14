@@ -1,7 +1,7 @@
 import { lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 import { createBrowserRouter, Navigate, Outlet } from 'react-router';
 import { Spinner } from '@/ui/display';
-import { RequireAdmin } from '@/features/admin/RequireAdmin';
+import { RequireAdmin, RequireMainAdmin } from '@/features/admin/RequireAdmin';
 import { NotFoundPage, RouteError } from './RouteError';
 
 function page(load: () => Promise<{ default: ComponentType }>): ReactNode {
@@ -52,7 +52,11 @@ export const router = createBrowserRouter([
           { path: 'rooms/new', element: page(() => import('@/features/admin/rooms/RoomWizardPage')) },
           { path: 'rooms/:id/edit', element: page(() => import('@/features/admin/rooms/RoomWizardPage')) },
           { path: 'rooms/:id', element: page(() => import('@/features/admin/rooms/RoomDetailPage')) },
-          { path: 'accounts', element: page(() => import('@/features/admin/accounts/AccountsPage')) },
+          { path: 'me', element: page(() => import('@/features/admin/accounts/MyAccountPage')) },
+          {
+            path: 'accounts',
+            element: <RequireMainAdmin>{page(() => import('@/features/admin/accounts/AccountsPage'))}</RequireMainAdmin>,
+          },
         ],
       },
       ...devRoutes,

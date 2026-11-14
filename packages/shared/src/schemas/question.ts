@@ -23,6 +23,8 @@ export const QuestionInput = z
     timeLimitSec: z.number().int().min(5).max(300).nullable().default(null),
     explanation: z.string().trim().max(500).nullable().default(null),
     tags: z.array(z.string().trim().min(1).max(20)).max(10).default([]),
+    /** public questions are visible (read-only) to other admins; private ones only to their creator */
+    isPublic: z.boolean().default(false),
     choices: z.array(ChoiceInput).min(MIN_CHOICES, '보기는 2개 이상이어야 해요.').max(MAX_CHOICES, '보기는 최대 6개까지예요.'),
   })
   .superRefine((q, ctx) => {
@@ -52,6 +54,10 @@ export interface QuestionDto {
   tags: string[];
   version: number;
   choices: ChoiceDto[];
+  isPublic: boolean;
+  /** true when the viewing admin created the question (only then it is editable) */
+  mine: boolean;
+  ownerName: string | null;
   createdAt: number;
   updatedAt: number;
   updatedByName: string | null;
@@ -66,6 +72,9 @@ export interface QuestionListItem {
   timeLimitSec: number | null;
   tags: string[];
   hasImage: boolean;
+  isPublic: boolean;
+  mine: boolean;
+  ownerName: string | null;
   updatedAt: number;
 }
 
@@ -73,6 +82,8 @@ export const QuestionListQuery = z.object({
   q: z.string().trim().max(100).optional(),
   kind: QuestionKind.optional(),
   tag: z.string().trim().max(20).optional(),
+  /** all = mine + public from others, mine = only mine, public = only public from others */
+  scope: z.enum(['all', 'mine', 'public']).default('all'),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(50),
 });

@@ -1,8 +1,8 @@
-import { AppError, AdminCreateInput, AdminPatchInput, LoginInput, PasswordChangeInput } from '@sq/shared';
+import { AppError, AdminCreateInput, AdminPatchInput, LoginInput, PasswordChangeInput, ProfilePatchInput } from '@sq/shared';
 import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../../context';
 import { hashPassword, verifyPassword } from '../../auth/password';
-import { requireAdmin, requireCsrf } from '../../auth/plugin';
+import { requireAdmin, requireCsrf, requireMainAdmin } from '../../auth/plugin';
 import { SESSION_COOKIE } from '../../auth/sessions';
 import { adminsRepo, toAdminDto } from '../../db/repos/admins';
 import { idParam, parse } from '../validate';
@@ -43,6 +43,12 @@ export function authRoutes(app: FastifyInstance, ctx: AppContext): void {
     return toAdminDto(adminsRepo.byId(db, req.admin.id)!);
   });
 
+  app.patch('/api/auth/me', { preHandler: requireAdmin }, async (req) => {
+    const body = parse(ProfilePatchInput, req.body);
+    adminsRepo.update(db, req.admin!.id, { displayName: body.displayName });
+    return toAdminDto(adminsRepo.byId(db, req.admin!.id)!);
+  });
+
   app.put('/api/auth/password', { preHandler: requireAdmin }, async (req) => {
     const body = parse(PasswordChangeInput, req.body);
     const row = adminsRepo.byId(db, req.admin!.id)!;
@@ -56,9 +62,9 @@ export function authRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   /* ---- admin accounts ---- */
 
-  app.get('/api/admin/admins', { preHandler: requireAdmin }, async () => adminsRepo.list(db).map(toAdminDto));
+  app.get('/api/admin/admins', { preHandler: requireMainAdmin }, async () => adminsRepo.list(db).map(toAdminDto));
 
-  app.post('/api/admin/admins', { preHandler: requireAdmin }, async (req) => {
+  app.post('/api/admin/admins', { preHandler: requireMainAdmin }, async (req) => {
     const body = parse(AdminCreateInput, req.body);
     if (adminsRepo.byUsername(db, body.username)) throw new AppError('USERNAME_TAKEN');
     const id = adminsRepo.insert(db, {
@@ -69,7 +75,7 @@ export function authRoutes(app: FastifyInstance, ctx: AppContext): void {
     return toAdminDto(adminsRepo.byId(db, id)!);
   });
 
-  app.patch('/api/admin/admins/:id', { preHandler: requireAdmin }, async (req) => {
+  app.patch('/api/admin/admins/:id', { preHandler: requireMainAdmin }, async (req) => {
     const id = idParam((req.params as { id: string }).id);
     const body = parse(AdminPatchInput, req.body);
     const row = adminsRepo.byId(db, id);

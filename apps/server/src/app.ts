@@ -224,7 +224,7 @@ async function seedAdmin(ctx: AppContext, fastify: FastifyInstance): Promise<voi
   const username = config.adminInitialUsername ?? 'admin';
   const generated = !config.adminInitialPassword;
   const password = config.adminInitialPassword ?? randomPassword();
-  adminsRepo.insert(db, { username, displayName: '관리자', passwordHash: await hashPassword(password) });
+  adminsRepo.insert(db, { username, displayName: '관리자', passwordHash: await hashPassword(password), role: 'MAIN' });
   if (generated) {
     const msg = `최초 관리자 계정을 만들었어요. 아이디: ${username} / 비밀번호: ${password}  (로그인 후 바로 비밀번호를 변경하세요)`;
     fastify.log.warn(msg);

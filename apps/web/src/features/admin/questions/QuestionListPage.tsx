@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { m } from 'motion/react';
 import { toast } from 'sonner';
-import { Copy, Image as ImageIcon, LibraryBig, Pencil, Plus, Search, Timer, Trash2, X } from 'lucide-react';
+import { Copy, Eye, Globe, Image as ImageIcon, LibraryBig, Lock, Pencil, Plus, Search, Timer, Trash2, X } from 'lucide-react';
 import type { QuestionKind, QuestionListItem } from '@sq/shared';
 import { cappedStagger, spring } from '@/design/motion';
 import { errorText } from '@/lib/api';
 import { cn, dateTime } from '@/lib/format';
 import { useDocumentTitle } from '@/hooks/dom';
 import { Button, IconButton } from '@/ui/Button';
-import { EmptyState, Spinner } from '@/ui/display';
+import { Badge, EmptyState, Spinner } from '@/ui/display';
 import { ConfirmDialog } from '@/ui/Dialog';
 import { Segmented } from '@/ui/fields';
 import { useDeleteQuestion, useDuplicateQuestion, useQuestionList } from '../api';
@@ -32,18 +32,19 @@ export default function QuestionListPage() {
   const [search, setSearch] = useState('');
   const [kind, setKind] = useState<'ALL' | QuestionKind>('ALL');
   const [tag, setTag] = useState<string | null>(null);
+  const [scope, setScope] = useState<'all' | 'mine' | 'public'>('all');
   const [page, setPage] = useState(1);
   const q = useDebounced(search.trim());
-  useEffect(() => setPage(1), [q, kind, tag]);
+  useEffect(() => setPage(1), [q, kind, tag, scope]);
 
-  const list = useQuestionList({ q: q || undefined, kind: kind === 'ALL' ? undefined : kind, tag: tag ?? undefined, page, pageSize: PAGE_SIZE });
+  const list = useQuestionList({ q: q || undefined, kind: kind === 'ALL' ? undefined : kind, tag: tag ?? undefined, scope, page, pageSize: PAGE_SIZE });
   const del = useDeleteQuestion();
   const dup = useDuplicateQuestion();
   const [toDelete, setToDelete] = useState<QuestionListItem | null>(null);
 
   const data = list.data;
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
-  const filtering = !!q || kind !== 'ALL' || !!tag;
+  const filtering = !!q || kind !== 'ALL' || !!tag || scope !== 'all';
 
   return (
     <>
@@ -69,6 +70,17 @@ export default function QuestionListPage() {
             className="h-12 w-full rounded-md border-2 border-n-400/70 bg-surface pr-4 pl-12 outline-none focus:border-info focus:ring-4 focus:ring-info/15"
           />
         </label>
+        <Segmented
+          label="작성자 범위"
+          className="shrink-0 [&_button]:whitespace-nowrap"
+          value={scope}
+          onChange={setScope}
+          options={[
+            { value: 'all', label: '전체' },
+            { value: 'mine', label: '내 문제' },
+            { value: 'public', label: '공개 문제' },
+          ]}
+        />
         <Segmented
           label="문제 유형"
           className="shrink-0 [&_button]:whitespace-nowrap"
@@ -140,11 +152,21 @@ export default function QuestionListPage() {
                 <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 p-4 lg:grid-cols-[90px_1fr_80px_90px_150px_140px] lg:gap-4 lg:px-5">
                   <div className="col-span-2 flex items-center gap-2 lg:col-span-1">
                     <KindBadge kind={item.kind} />
+                    {item.isPublic ? (
+                      <Badge tone="info" className="gap-1">
+                        <Globe className="size-3" aria-hidden="true" /> 공개
+                      </Badge>
+                    ) : (
+                      <Badge tone="neutral" className="gap-1">
+                        <Lock className="size-3" aria-hidden="true" /> 비공개
+                      </Badge>
+                    )}
                     {item.hasImage && <ImageIcon className="size-4 text-n-400" aria-label="이미지 포함" />}
                   </div>
                   <Link to={`/admin/questions/${item.id}`} className="col-span-2 min-w-0 lg:col-span-1 after:absolute after:inset-0 after:content-['']">
                     <p className="truncate font-bold">{item.title || item.preview || '(내용 없음)'}</p>
                     {item.title && <p className="truncate text-sm text-fg-muted">{item.preview}</p>}
+                    {!item.mine && <p className="truncate text-xs font-semibold text-fg-muted">작성자 {item.ownerName ?? '알 수 없음'} · 읽기 전용</p>}
                     {item.tags.length > 0 && (
                       <p className="mt-1 flex flex-wrap gap-1">
                         {item.tags.map((t) => (
@@ -162,24 +184,26 @@ export default function QuestionListPage() {
                   </span>
                   <span className="hidden text-sm text-fg-muted lg:block">{dateTime(item.updatedAt)}</span>
                   <div className="relative z-10 col-span-2 flex justify-end gap-1 border-t border-line/60 pt-2 lg:col-span-1 lg:border-0 lg:pt-0">
-                    <IconButton label="수정" onClick={() => navigate(`/admin/questions/${item.id}`)}>
-                      <Pencil className="size-5" />
+                    <IconButton label={item.mine ? '수정' : '보기'} onClick={() => navigate(`/admin/questions/${item.id}`)}>
+                      {item.mine ? <Pencil className="size-5" /> : <Eye className="size-5" />}
                     </IconButton>
                     <IconButton
                       label="복제"
                       disabled={dup.isPending}
                       onClick={() =>
                         dup.mutate(item.id, {
-                          onSuccess: () => toast.success('문제를 복제했어요.'),
+                          onSuccess: () => toast.success(item.mine ? '문제를 복제했어요.' : '내 문제로 복제했어요. (비공개)'),
                           onError: (err) => toast.error(errorText(err)),
                         })
                       }
                     >
                       <Copy className="size-5" />
                     </IconButton>
-                    <IconButton label="삭제" className="hover:text-danger-text" onClick={() => setToDelete(item)}>
-                      <Trash2 className="size-5" />
-                    </IconButton>
+                    {item.mine && (
+                      <IconButton label="삭제" className="hover:text-danger-text" onClick={() => setToDelete(item)}>
+                        <Trash2 className="size-5" />
+                      </IconButton>
+                    )}
                   </div>
                 </div>
               </m.li>

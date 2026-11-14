@@ -43,7 +43,8 @@ async function adminCommand(kind: 'create' | 'passwd'): Promise<void> {
       console.error('이미 있는 아이디예요.');
       process.exit(1);
     }
-    adminsRepo.insert(db, { username, displayName: parsed.data.displayName, passwordHash: await hashPassword(password) });
+    const role = adminsRepo.count(db) === 0 ? 'MAIN' : 'ADMIN';
+    adminsRepo.insert(db, { username, displayName: parsed.data.displayName, passwordHash: await hashPassword(password), role });
     console.log(`관리자 '${username}' 계정을 만들었어요.`);
   } else {
     if (!existing) {

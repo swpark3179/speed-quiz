@@ -38,6 +38,7 @@ export interface QuestionListParams {
   q?: string;
   kind?: QuestionKind;
   tag?: string;
+  scope?: 'all' | 'mine' | 'public';
   page?: number;
   pageSize?: number;
 }
@@ -62,7 +63,7 @@ export function useQuestionList(params: QuestionListParams) {
     queryKey: qk.questionList(params),
     queryFn: ({ signal }) =>
       get<QuestionListResponse>(
-        `/api/admin/questions${qs({ q: params.q, kind: params.kind, tag: params.tag, page: params.page, pageSize: params.pageSize })}`,
+        `/api/admin/questions${qs({ q: params.q, kind: params.kind, tag: params.tag, scope: params.scope, page: params.page, pageSize: params.pageSize })}`,
         signal,
       ),
     placeholderData: keepPreviousData,
@@ -198,5 +199,16 @@ export function usePatchAdmin() {
 export function useChangePassword() {
   return useMutation({
     mutationFn: (body: { currentPassword: string; newPassword: string }) => put<{ ok: true }>('/api/auth/password', body),
+  });
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { displayName: string }) => patch<AdminDto>('/api/auth/me', body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['auth', 'me'] });
+      void qc.invalidateQueries({ queryKey: qk.admins });
+    },
   });
 }

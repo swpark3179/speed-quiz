@@ -47,7 +47,7 @@ function CreateAdminDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       open={open}
       onOpenChange={close}
       title="관리자 추가"
-      description="추가한 관리자는 문제은행과 퀴즈방을 함께 관리할 수 있어요."
+      description="추가한 관리자는 자신의 퀴즈방과 문제은행을 따로 관리해요. (관리자 관리 화면은 메인 관리자만 볼 수 있어요.)"
       footer={
         <>
           <Button variant="ghost" onClick={() => close(false)}>
@@ -155,7 +155,7 @@ export default function AccountsPage() {
     <>
       <PageHeader
         title="관리자 계정"
-        description="관리자는 모두 같은 권한으로 문제은행과 퀴즈방을 함께 써요."
+        description="일반 관리자는 자신이 만든 퀴즈방과 문제은행만 다뤄요. 이 화면은 메인 관리자만 볼 수 있어요."
         actions={
           <Button icon={<Plus className="size-5" />} onClick={() => setCreateOpen(true)}>
             관리자 추가
@@ -189,6 +189,7 @@ export default function AccountsPage() {
                         <p className="flex flex-wrap items-center gap-2 font-bold">
                           <span className="truncate">{a.displayName}</span>
                           {self && <Badge tone="spark">나</Badge>}
+                          {a.role === 'MAIN' && <Badge tone="ink">메인</Badge>}
                           {a.disabled ? <Badge tone="neutral">비활성</Badge> : <Badge tone="success" dot>활성</Badge>}
                         </p>
                         <p className="truncate text-sm text-fg-muted">

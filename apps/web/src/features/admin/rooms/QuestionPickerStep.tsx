@@ -127,6 +127,11 @@ function BankPane({ selectedIds, onToggle }: { selectedIds: Set<number>; onToggl
                     <span className="flex items-center gap-2">
                       <KindBadge kind={item.kind} />
                       <span className="truncate font-bold">{item.title || item.preview}</span>
+                      {!item.mine && (
+                        <span className="shrink-0 rounded-full bg-info-tint px-2 py-0.5 text-xs font-bold text-info-dark">
+                          {item.ownerName ?? '공개'} 님
+                        </span>
+                      )}
                     </span>
                     {item.title && <span className="mt-0.5 block truncate text-sm text-fg-muted">{item.preview}</span>}
                   </span>
