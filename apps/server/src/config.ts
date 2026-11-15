@@ -8,6 +8,11 @@ export interface Config {
   host: string;
   port: number;
   publicBaseUrl: string | null;
+  /**
+   * Port to put in auto-generated join/QR links when it differs from the listening port
+   * (e.g. firewalld/iptables redirects :80 → :3000, so users must connect on 80). Ignored if publicBaseUrl is set.
+   */
+  publicPort: number | null;
   dataDir: string;
   dbPath: string;
   uploadsDir: string;
@@ -49,6 +54,10 @@ function int(v: string | undefined, def: number): number {
   return Number.isFinite(n) ? Math.trunc(n) : def;
 }
 
+function validPort(n: number): number | null {
+  return Number.isInteger(n) && n >= 1 && n <= 65535 ? n : null;
+}
+
 export function loadConfig(overrides: Partial<Config> = {}): Config {
   const appRoot = overrides.appRoot ?? resolveAppRoot();
   const envFile = path.join(appRoot, '.env');
@@ -68,6 +77,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     host: env.HOST || '0.0.0.0',
     port: int(env.PORT, 3000),
     publicBaseUrl: env.PUBLIC_BASE_URL ? env.PUBLIC_BASE_URL.replace(/\/+$/, '') : null,
+    publicPort: validPort(int(env.PUBLIC_PORT, NaN)),
     dataDir,
     dbPath: path.join(dataDir, 'speed-quiz.db'),
     uploadsDir: path.join(dataDir, 'uploads'),
@@ -107,9 +117,19 @@ export function lanAddresses(): string[] {
 
 export function baseUrlFor(cfg: Config, requestOrigin?: string | null): string {
   if (cfg.publicBaseUrl) return cfg.publicBaseUrl;
-  if (requestOrigin && !/\/\/(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(requestOrigin)) return requestOrigin;
+  const port = cfg.publicPort ?? cfg.port;
+  const portSuffix = port === 80 ? '' : `:${port}`;
+  if (requestOrigin && !/\/\/(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(requestOrigin)) {
+    if (cfg.publicPort === null) return requestOrigin;
+    // The admin may have opened the page on the real port (:3000); links for participants must use the public one.
+    try {
+      const u = new URL(requestOrigin);
+      return `${u.protocol}//${u.hostname}${cfg.publicPort === 80 && u.protocol === 'http:' ? '' : `:${cfg.publicPort}`}`;
+    } catch {
+      return requestOrigin;
+    }
+  }
   const ip = lanAddresses()[0];
-  const port = cfg.port === 80 ? '' : `:${cfg.port}`;
-  if (ip) return `http://${ip}${port}`;
-  return requestOrigin ?? `http://localhost${port}`;
+  if (ip) return `http://${ip}${portSuffix}`;
+  return requestOrigin ?? `http://localhost${portSuffix}`;
 }
