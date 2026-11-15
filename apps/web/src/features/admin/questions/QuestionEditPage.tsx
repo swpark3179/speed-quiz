@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useBlocker, useNavigate, useParams } from 'react-router';
+import { Link, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, Copy, Globe, ImagePlus, Lock, Save, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Copy, Folder, FolderPlus, Globe, ImagePlus, Lock, Save, Trash2, X } from 'lucide-react';
 import { QuestionInput, type QuestionDto, type QuestionKind } from '@sq/shared';
 import { errorText, uploadImage } from '@/lib/api';
 import { cn } from '@/lib/format';
@@ -11,11 +11,12 @@ import { Button } from '@/ui/Button';
 import { Spinner } from '@/ui/display';
 import { ConfirmDialog } from '@/ui/Dialog';
 import { Segmented, Select, TextArea, TextField } from '@/ui/fields';
-import { useDeleteQuestion, useDuplicateQuestion, useQuestion, useSaveQuestion } from '../api';
+import { useDeleteQuestion, useDuplicateQuestion, useQuestion, useQuestionGroups, useSaveQuestion } from '../api';
 import { PageHeader } from '../components/common';
 import { ChoiceEditor, HtmlToolbar, TagInput, newChoiceKey, type ChoiceDraft } from './editor-parts';
 import { PhonePreview, StagePreview } from './QuestionPreview';
 import { HtmlImportButton } from './HtmlImport';
+import { GroupNameDialog } from './groups';
 
 interface Draft {
   kind: QuestionKind;
@@ -26,12 +27,13 @@ interface Draft {
   explanation: string;
   tags: string[];
   isPublic: boolean;
+  groupId: number | null;
   choices: ChoiceDraft[];
 }
 
 const TIME_OPTIONS = [5, 10, 15, 20, 30, 45, 60, 90, 120];
 
-function emptyDraft(): Draft {
+function emptyDraft(groupId: number | null = null): Draft {
   return {
     kind: 'TEXT',
     title: '',
@@ -41,6 +43,7 @@ function emptyDraft(): Draft {
     explanation: '',
     tags: [],
     isPublic: false,
+    groupId,
     choices: Array.from({ length: 4 }, (_, i) => ({ key: newChoiceKey(), text: '', isCorrect: i === 0 })),
   };
 }
@@ -55,6 +58,7 @@ function fromDto(q: QuestionDto): Draft {
     explanation: q.explanation ?? '',
     tags: q.tags,
     isPublic: q.isPublic,
+    groupId: q.groupId,
     choices: q.choices.map((c) => ({ key: newChoiceKey(), text: c.text, isCorrect: c.isCorrect })),
   };
 }
@@ -69,9 +73,13 @@ function toInput(d: Draft) {
     explanation: d.explanation.trim() ? d.explanation : null,
     tags: d.tags,
     isPublic: d.isPublic,
+    groupId: d.groupId,
     choices: d.choices.map((c) => ({ text: c.text, isCorrect: c.isCorrect })),
   };
 }
+
+/** Back to the bank, with the question's group opened. */
+const bankUrl = (groupId: number | null | undefined) => (groupId ? `/admin/questions?group=${groupId}` : '/admin/questions');
 
 const fingerprint = (d: Draft) => JSON.stringify(toInput(d));
 
@@ -81,12 +89,18 @@ export default function QuestionEditPage() {
   const isNew = id === null;
   useDocumentTitle(isNew ? '새 문제' : '문제');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const query = useQuestion(id);
+  const myGroups = useQuestionGroups({ scope: 'mine' });
+  const [groupDialog, setGroupDialog] = useState(false);
   const save = useSaveQuestion();
   const dup = useDuplicateQuestion();
   const del = useDeleteQuestion();
 
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [draft, setDraft] = useState<Draft>(() => {
+    const g = Number(searchParams.get('group'));
+    return emptyDraft(isNew && Number.isInteger(g) && g > 0 ? g : null);
+  });
   const [initial, setInitial] = useState(() => fingerprint(draft));
   const [loadedId, setLoadedId] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -146,10 +160,10 @@ export default function QuestionEditPage() {
       return;
     }
     try {
-      await save.mutateAsync({ id, input: parsed.data });
+      const saved = await save.mutateAsync({ id, input: parsed.data });
       toast.success(isNew ? '문제를 만들었어요.' : '문제를 저장했어요.');
       allowLeave.current = true;
-      navigate('/admin/questions');
+      navigate(bankUrl(saved.groupId));
     } catch (err) {
       toast.error(errorText(err));
     }
@@ -185,7 +199,7 @@ export default function QuestionEditPage() {
     <>
       <PageHeader
         back={
-          <Link to="/admin/questions" className="inline-flex items-center gap-1 text-sm font-bold text-fg-muted hover:text-fg">
+          <Link to={bankUrl(query.data?.groupId ?? draft.groupId)} className="inline-flex items-center gap-1 text-sm font-bold text-fg-muted hover:text-fg">
             <ArrowLeft className="size-4" /> 문제은행
           </Link>
         }
@@ -363,6 +377,45 @@ export default function QuestionEditPage() {
           </section>
 
           <section className="grid gap-5 rounded-lg bg-surface p-5 shadow-sm ring-1 ring-line/60 md:p-6">
+            {readOnly ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="flex items-center gap-1.5 text-sm font-bold">
+                  <Folder className="size-4" aria-hidden="true" /> 그룹
+                </span>
+                <p className="text-fg-muted">{query.data?.groupName ?? '없음'}</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-end justify-between gap-2">
+                  <label htmlFor="question-group" className="flex items-center gap-1.5 text-sm font-bold">
+                    <Folder className="size-4" aria-hidden="true" /> 그룹
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setGroupDialog(true)}
+                    className="-my-1 inline-flex h-8 items-center gap-1 rounded-sm px-2 text-sm font-bold text-info-dark hover:bg-info-tint"
+                  >
+                    <FolderPlus className="size-4" aria-hidden="true" /> 새 그룹
+                  </button>
+                </div>
+                <Select
+                  id="question-group"
+                  value={draft.groupId ?? ''}
+                  onChange={(e) => set('groupId', e.target.value ? Number(e.target.value) : null)}
+                  hint="비슷한 문제를 묶어 두면 목록이 간단해지고, 퀴즈방에 그룹째 넣을 수 있어요."
+                >
+                  <option value="">그룹 없음</option>
+                  {draft.groupId !== null && myGroups.data && !myGroups.data.some((g) => g.id === draft.groupId) && (
+                    <option value={draft.groupId}>{query.data?.groupName ?? '(알 수 없는 그룹)'}</option>
+                  )}
+                  {myGroups.data?.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
             <div className="flex flex-col gap-1.5">
               <span className="flex items-center gap-1.5 text-sm font-bold">
                 {draft.isPublic ? <Globe className="size-4" aria-hidden="true" /> : <Lock className="size-4" aria-hidden="true" />}
@@ -449,6 +502,7 @@ export default function QuestionEditPage() {
         </aside>
       </div>
 
+      <GroupNameDialog open={groupDialog} onOpenChange={setGroupDialog} group={null} onSaved={(g) => set('groupId', g.id)} />
       <ConfirmDialog
         open={blocker.state === 'blocked'}
         onOpenChange={(v) => !v && blocker.state === 'blocked' && blocker.reset()}
@@ -470,7 +524,7 @@ export default function QuestionEditPage() {
             await del.mutateAsync(id!);
             toast.success('문제를 삭제했어요.');
             allowLeave.current = true;
-            navigate('/admin/questions');
+            navigate(bankUrl(query.data?.groupId));
           } catch (err) {
             toast.error(errorText(err));
           }

@@ -139,6 +139,20 @@ const MIGRATIONS: string[] = [
   CREATE INDEX ix_questions_owner ON questions(created_by);
   CREATE INDEX ix_rooms_owner ON rooms(created_by);
   `,
+  /* 3: question groups (folder-like: a question belongs to at most one group of its own creator) */ `
+  CREATE TABLE question_groups (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_by INTEGER REFERENCES admins(id) ON DELETE SET NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  ) STRICT;
+  CREATE UNIQUE INDEX ux_question_groups_name ON question_groups(created_by, name COLLATE NOCASE);
+
+  ALTER TABLE questions ADD COLUMN group_id INTEGER REFERENCES question_groups(id) ON DELETE SET NULL;
+  ALTER TABLE questions ADD COLUMN group_position INTEGER;
+  CREATE INDEX ix_questions_group ON questions(group_id, group_position) WHERE group_id IS NOT NULL;
+  `,
 ];
 
 export function migrate(db: Db): void {

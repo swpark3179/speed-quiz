@@ -198,3 +198,45 @@ describe('report html', () => {
     expect(html).toContain('빈 방');
   });
 });
+
+describe('question groups over HTTP', () => {
+  it('lists, moves and protects groups per admin', async () => {
+    const g = await main.api('POST', '/api/admin/question-groups', { name: '메인 그룹' });
+    expect(g.status).toBe(200);
+    expect((await main.api('POST', '/api/admin/question-groups', { name: '메인 그룹' })).status).toBe(409);
+    expect((await main.api('POST', '/api/admin/question-groups', { name: '  ' })).status).toBe(400);
+
+    const a = (await main.api('POST', '/api/admin/questions', q({ isPublic: true, body: '그룹 문제 A' }))).data;
+    const b = (await main.api('POST', '/api/admin/questions', q({ isPublic: false, body: '그룹 문제 B' }))).data;
+    const moved = await main.api('POST', '/api/admin/questions/move', { questionIds: [b.id, a.id], groupId: g.data.id });
+    expect(moved.data).toEqual({ moved: 2 });
+
+    const inGroup = (await main.api('GET', `/api/admin/questions?groupId=${g.data.id}`)).data.items.map((i: { id: number }) => i.id);
+    expect(inGroup).toEqual([b.id, a.id]);
+    const ungrouped = (await main.api('GET', '/api/admin/questions?ungrouped=1&pageSize=200')).data.items.map((i: { id: number }) => i.id);
+    expect(ungrouped).not.toContain(a.id);
+    expect((await main.api('GET', '/api/admin/questions?ungrouped=0&pageSize=200')).data.items.map((i: { id: number }) => i.id)).toContain(a.id);
+
+    const mainGroups = (await main.api('GET', '/api/admin/question-groups')).data.items;
+    expect(mainGroups.find((x: { id: number }) => x.id === g.data.id)).toMatchObject({ questionCount: 2, publicCount: 1, mine: true });
+    const bobGroups = (await bob.api('GET', '/api/admin/question-groups')).data.items;
+    expect(bobGroups.find((x: { id: number }) => x.id === g.data.id)).toMatchObject({ questionCount: 1, mine: false });
+    expect((await bob.api('GET', `/api/admin/questions?groupId=${g.data.id}`)).data.items.map((i: { id: number }) => i.id)).toEqual([a.id]);
+
+    for (const [method, url, body] of [
+      ['PATCH', `/api/admin/question-groups/${g.data.id}`, { name: 'x' }],
+      ['DELETE', `/api/admin/question-groups/${g.data.id}`],
+      ['PUT', `/api/admin/question-groups/${g.data.id}/order`, { questionIds: [a.id] }],
+      ['POST', `/api/admin/question-groups/${g.data.id}/visibility`, { isPublic: true }],
+      ['POST', '/api/admin/questions/move', { questionIds: [a.id], groupId: null }],
+    ] as const) {
+      expect((await bob.api(method, url, body)).status, `${method} ${url}`).toBe(403);
+    }
+
+    expect((await main.api('PUT', `/api/admin/question-groups/${g.data.id}/order`, { questionIds: [a.id, b.id] })).status).toBe(200);
+    expect((await main.api('PUT', `/api/admin/question-groups/${g.data.id}/order`, { questionIds: [a.id] })).status).toBe(409);
+    expect((await main.api('POST', `/api/admin/question-groups/${g.data.id}/visibility`, { isPublic: true })).data).toEqual({ changed: 1 });
+    expect((await main.api('DELETE', `/api/admin/question-groups/${g.data.id}?withQuestions=1`)).data).toEqual({ ok: true, deletedQuestions: 2 });
+    expect((await main.api('GET', `/api/admin/questions/${a.id}`)).status).toBe(404);
+  });
+});

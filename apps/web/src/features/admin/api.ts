@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, keepPreviousData, queryOptions } from '@tanstack/react-query';
 import type {
   AdminCreateInput,
   AdminDto,
@@ -6,6 +6,8 @@ import type {
   AdminStatsDto,
   ConfirmResult,
   QuestionDto,
+  QuestionFilters,
+  QuestionGroupDto,
   QuestionInput,
   QuestionKind,
   QuestionListItem,
@@ -24,6 +26,8 @@ export const qk = {
   questions: ['questions'] as const,
   questionList: (p: QuestionListParams) => ['questions', 'list', p] as const,
   question: (id: number) => ['questions', 'one', id] as const,
+  // under 'questions' so every question mutation also refreshes the groups (their counts)
+  questionGroups: (f: QuestionFilters) => ['questions', 'groups', f] as const,
   rooms: ['rooms'] as const,
   roomList: ['rooms', 'list'] as const,
   room: (id: number) => ['rooms', 'one', id] as const,
@@ -42,6 +46,10 @@ export interface QuestionListParams {
   kind?: QuestionKind;
   tag?: string;
   scope?: 'all' | 'mine' | 'public';
+  /** only this group's questions, in group order */
+  groupId?: number;
+  /** only questions in no group */
+  ungrouped?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -61,16 +69,28 @@ function qs(params: Record<string, string | number | undefined>): string {
   return s ? `?${s}` : '';
 }
 
-export function useQuestionList(params: QuestionListParams) {
-  return useQuery({
+export function questionListQuery(params: QuestionListParams) {
+  return queryOptions({
     queryKey: qk.questionList(params),
     queryFn: ({ signal }) =>
       get<QuestionListResponse>(
-        `/api/admin/questions${qs({ q: params.q, kind: params.kind, tag: params.tag, scope: params.scope, page: params.page, pageSize: params.pageSize })}`,
+        `/api/admin/questions${qs({
+          q: params.q,
+          kind: params.kind,
+          tag: params.tag,
+          scope: params.scope,
+          groupId: params.groupId,
+          ungrouped: params.ungrouped ? 1 : undefined,
+          page: params.page,
+          pageSize: params.pageSize,
+        })}`,
         signal,
       ),
-    placeholderData: keepPreviousData,
   });
+}
+
+export function useQuestionList(params: QuestionListParams) {
+  return useQuery({ ...questionListQuery(params), placeholderData: keepPreviousData });
 }
 
 export function useQuestion(id: number | null) {
@@ -112,6 +132,61 @@ export function useDuplicateQuestion() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: qk.questions }),
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* Question groups                                                     */
+/* ------------------------------------------------------------------ */
+
+export function useQuestionGroups(filters: QuestionFilters = {}) {
+  return useQuery({
+    queryKey: qk.questionGroups(filters),
+    queryFn: async ({ signal }): Promise<QuestionGroupDto[]> =>
+      (
+        await get<{ items: QuestionGroupDto[] }>(
+          `/api/admin/question-groups${qs({ q: filters.q, kind: filters.kind, tag: filters.tag, scope: filters.scope })}`,
+          signal,
+        )
+      ).items,
+    placeholderData: keepPreviousData,
+  });
+}
+
+function useQuestionMutation<V, R>(fn: (v: V) => Promise<R>, opts: { rooms?: boolean } = {}) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: qk.questions });
+      if (opts.rooms) void qc.invalidateQueries({ queryKey: qk.rooms });
+    },
+  });
+}
+
+export const useSaveGroup = () =>
+  useQuestionMutation(({ id, name }: { id: number | null; name: string }) =>
+    id === null ? post<QuestionGroupDto>('/api/admin/question-groups', { name }) : patch<QuestionGroupDto>(`/api/admin/question-groups/${id}`, { name }),
+  );
+
+export const useDeleteGroup = () =>
+  useQuestionMutation(
+    ({ id, withQuestions }: { id: number; withQuestions: boolean }) =>
+      del<{ ok: true; deletedQuestions: number }>(`/api/admin/question-groups/${id}${withQuestions ? '?withQuestions=1' : ''}`),
+    { rooms: true },
+  );
+
+export const useMoveQuestions = () =>
+  useQuestionMutation((body: { questionIds: number[]; groupId: number | null }) => post<{ moved: number }>('/api/admin/questions/move', body));
+
+export const useReorderGroup = () =>
+  useQuestionMutation(({ id, questionIds }: { id: number; questionIds: number[] }) =>
+    put<{ ok: true }>(`/api/admin/question-groups/${id}/order`, { questionIds }),
+  );
+
+export const useGroupVisibility = () =>
+  useQuestionMutation(
+    ({ id, isPublic }: { id: number; isPublic: boolean }) => post<{ changed: number }>(`/api/admin/question-groups/${id}/visibility`, { isPublic }),
+    { rooms: true },
+  );
 
 /* ------------------------------------------------------------------ */
 /* Rooms                                                               */

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { AnimatePresence, m } from 'motion/react';
 import {
@@ -13,15 +15,17 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { AlertTriangle, Check, GripVertical, Plus, Search, X } from 'lucide-react';
-import type { QuestionKind, RoomDraftItemDto } from '@sq/shared';
+import { AlertTriangle, Check, ChevronRight, GripVertical, ListPlus, Minus, Plus, Search, X } from 'lucide-react';
+import { MAX_ROOM_ITEMS, type QuestionFilters, type QuestionGroupDto, type QuestionKind, type QuestionListItem, type RoomDraftItemDto } from '@sq/shared';
 import { cappedStagger, spring } from '@/design/motion';
+import { errorText } from '@/lib/api';
 import { cn } from '@/lib/format';
-import { IconButton } from '@/ui/Button';
+import { Button, IconButton } from '@/ui/Button';
 import { EmptyState, Spinner } from '@/ui/display';
 import { Segmented } from '@/ui/fields';
-import { useQuestionList } from '../api';
+import { questionListQuery, useQuestionGroups, useQuestionList } from '../api';
 import { KindBadge } from '../components/common';
+import { GroupIcon } from '../questions/groups';
 
 export type QuestionBrief = NonNullable<RoomDraftItemDto['question']>;
 
@@ -48,11 +52,178 @@ function useDebounced<T>(value: T, ms = 250): T {
   return v;
 }
 
-function BankPane({ selectedIds, onToggle }: { selectedIds: Set<number>; onToggle: (q: QuestionBrief) => void }) {
+const brief = (item: QuestionListItem): QuestionBrief => ({
+  id: item.id,
+  kind: item.kind,
+  title: item.title,
+  preview: item.preview,
+  choiceCount: item.choiceCount,
+  timeLimitSec: item.timeLimitSec,
+});
+
+function BankItem({ item, index, on, onToggle }: { item: QuestionListItem; index: number; on: boolean; onToggle: () => void }) {
+  return (
+    <m.li initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring.gentle, delay: cappedStagger(index) }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={on}
+        className={cn(
+          'flex min-h-16 w-full items-center gap-3 rounded-md p-3 text-left ring-2 transition-colors',
+          on ? 'bg-spark-50 ring-spark-500' : 'bg-surface ring-line/70 hover:ring-n-400',
+        )}
+      >
+        <span
+          className={cn('flex size-7 shrink-0 items-center justify-center rounded-sm transition-colors', on ? 'bg-ink text-spark-400' : 'bg-n-100 text-n-400')}
+          aria-hidden="true"
+        >
+          {on ? <Check className="size-5" strokeWidth={3} /> : <Plus className="size-5" />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <KindBadge kind={item.kind} />
+            <span className="truncate font-bold">{item.title || item.preview}</span>
+            {!item.mine && (
+              <span className="shrink-0 rounded-full bg-info-tint px-2 py-0.5 text-xs font-bold text-info-dark">{item.ownerName ?? '공개'} 님</span>
+            )}
+          </span>
+          {item.title && <span className="mt-0.5 block truncate text-sm text-fg-muted">{item.preview}</span>}
+        </span>
+        <span className="hidden shrink-0 text-xs font-semibold text-fg-muted sm:block">보기 {item.choiceCount}</span>
+      </button>
+    </m.li>
+  );
+}
+
+function BankGroup({
+  group,
+  filters,
+  filtering,
+  selectedIds,
+  onToggle,
+  onAddAll,
+  onRemoveAll,
+}: {
+  group: QuestionGroupDto;
+  filters: QuestionFilters;
+  filtering: boolean;
+  selectedIds: Set<number>;
+  onToggle: (q: QuestionBrief) => void;
+  onAddAll: () => Promise<void>;
+  onRemoveAll: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const picked = group.questionIds.filter((id) => selectedIds.has(id)).length;
+  const total = group.questionIds.length;
+  const all = total > 0 && picked === total;
+  const bodyId = `bank-group-${group.id}`;
+  return (
+    <li className={cn('rounded-md ring-2 transition-colors', picked > 0 ? 'ring-spark-500/60' : 'ring-line/70')}>
+      <div className="flex items-center gap-2 p-2 pr-2.5">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-controls={bodyId}
+          className="flex min-h-12 min-w-0 flex-1 items-center gap-2 rounded-sm text-left outline-none focus-visible:ring-3 focus-visible:ring-info"
+        >
+          <ChevronRight className={cn('size-5 shrink-0 text-n-400 transition-transform', open && 'rotate-90')} aria-hidden="true" />
+          <GroupIcon open={open} className="size-9" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-bold">{group.name}</span>
+            <span className="tabular block truncate text-xs font-semibold text-fg-muted">
+              {picked > 0 ? `${picked}/${total}개 선택` : `문제 ${total}개`}
+              {filtering && ` · 일치 ${group.matchCount}개`}
+              {!group.mine && ` · ${group.ownerName ?? '공개'} 님`}
+            </span>
+          </span>
+        </button>
+        {all ? (
+          <Button size="sm" variant="subtle" icon={<Minus className="size-4" />} onClick={onRemoveAll} aria-label={`${group.name} 그룹 문제 모두 빼기`}>
+            전체 빼기
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="ink"
+            icon={<ListPlus className="size-4" />}
+            loading={adding}
+            disabled={total === 0}
+            aria-label={`${group.name} 그룹 문제 ${total - picked}개 모두 추가`}
+            onClick={async () => {
+              setAdding(true);
+              try {
+                await onAddAll();
+                setOpen(false);
+              } finally {
+                setAdding(false);
+              }
+            }}
+          >
+            전체 추가
+          </Button>
+        )}
+      </div>
+      {open && (
+        <div id={bodyId} className="rounded-b-md border-t border-line/70 bg-n-25 p-2">
+          <GroupItems groupId={group.id} filters={filters} selectedIds={selectedIds} onToggle={onToggle} />
+        </div>
+      )}
+    </li>
+  );
+}
+
+function GroupItems({
+  groupId,
+  filters,
+  selectedIds,
+  onToggle,
+}: {
+  groupId: number;
+  filters: QuestionFilters;
+  selectedIds: Set<number>;
+  onToggle: (q: QuestionBrief) => void;
+}) {
+  const list = useQuestionList({ ...filters, groupId, pageSize: 200 });
+  if (list.isPending) {
+    return (
+      <div className="flex justify-center py-4 text-n-400">
+        <Spinner className="size-6" />
+      </div>
+    );
+  }
+  const items = list.data?.items ?? [];
+  if (items.length === 0) return <p className="py-3 text-center text-sm font-semibold text-fg-muted">조건에 맞는 문제가 없어요.</p>;
+  return (
+    <ul className="flex flex-col gap-2">
+      {items.map((item, i) => (
+        <BankItem key={item.id} item={item} index={i} on={selectedIds.has(item.id)} onToggle={() => onToggle(brief(item))} />
+      ))}
+    </ul>
+  );
+}
+
+function BankPane({
+  selectedIds,
+  onToggle,
+  onAddGroup,
+  onRemoveGroup,
+}: {
+  selectedIds: Set<number>;
+  onToggle: (q: QuestionBrief) => void;
+  onAddGroup: (g: QuestionGroupDto) => Promise<void>;
+  onRemoveGroup: (g: QuestionGroupDto) => void;
+}) {
   const [search, setSearch] = useState('');
   const [kind, setKind] = useState<'ALL' | QuestionKind>('ALL');
   const q = useDebounced(search.trim());
-  const list = useQuestionList({ q: q || undefined, kind: kind === 'ALL' ? undefined : kind, pageSize: 200 });
+  const filters: QuestionFilters = { q: q || undefined, kind: kind === 'ALL' ? undefined : kind };
+  const filtering = !!q || kind !== 'ALL';
+  const groups = useQuestionGroups(filters);
+  const list = useQuestionList({ ...filters, ungrouped: true, pageSize: 200 });
+  const groupList = groups.data ?? [];
+  const items = list.data?.items ?? [];
 
   return (
     <div className="flex min-h-0 flex-col gap-3">
@@ -64,7 +235,7 @@ function BankPane({ selectedIds, onToggle }: { selectedIds: Set<number>; onToggl
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="문제 검색"
+            placeholder="문제·그룹 검색"
             className="h-12 w-full rounded-md border-2 border-n-400/70 bg-surface pr-3 pl-10 outline-none focus:border-info focus:ring-4 focus:ring-info/15"
           />
         </label>
@@ -80,67 +251,48 @@ function BankPane({ selectedIds, onToggle }: { selectedIds: Set<number>; onToggl
           ]}
         />
       </div>
-      {list.isPending ? (
+      {list.isPending || groups.isPending ? (
         <div className="flex justify-center py-12 text-n-400">
           <Spinner className="size-7" />
         </div>
-      ) : !list.data || list.data.items.length === 0 ? (
-        <EmptyState title={q || kind !== 'ALL' ? '조건에 맞는 문제가 없어요' : '문제은행이 비어 있어요'}>
+      ) : items.length === 0 && groupList.length === 0 ? (
+        <EmptyState title={filtering ? '조건에 맞는 문제가 없어요' : '문제은행이 비어 있어요'}>
           <Link to="/admin/questions/new" className="font-bold text-info underline">
             새 문제 만들기
           </Link>
         </EmptyState>
       ) : (
-        <ul className="-mx-1 flex max-h-[min(60vh,640px)] flex-col gap-2 overflow-y-auto p-1 scrollbar-thin">
-          {list.data.items.map((item, i) => {
-            const on = selectedIds.has(item.id);
-            return (
-              <m.li key={item.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring.gentle, delay: cappedStagger(i) }}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onToggle({
-                      id: item.id,
-                      kind: item.kind,
-                      title: item.title,
-                      preview: item.preview,
-                      choiceCount: item.choiceCount,
-                      timeLimitSec: item.timeLimitSec,
-                    })
-                  }
-                  aria-pressed={on}
-                  className={cn(
-                    'flex min-h-16 w-full items-center gap-3 rounded-md p-3 text-left ring-2 transition-colors',
-                    on ? 'bg-spark-50 ring-spark-500' : 'bg-surface ring-line/70 hover:ring-n-400',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'flex size-7 shrink-0 items-center justify-center rounded-sm transition-colors',
-                      on ? 'bg-ink text-spark-400' : 'bg-n-100 text-n-400',
-                    )}
-                    aria-hidden="true"
-                  >
-                    {on ? <Check className="size-5" strokeWidth={3} /> : <Plus className="size-5" />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <KindBadge kind={item.kind} />
-                      <span className="truncate font-bold">{item.title || item.preview}</span>
-                      {!item.mine && (
-                        <span className="shrink-0 rounded-full bg-info-tint px-2 py-0.5 text-xs font-bold text-info-dark">
-                          {item.ownerName ?? '공개'} 님
-                        </span>
-                      )}
-                    </span>
-                    {item.title && <span className="mt-0.5 block truncate text-sm text-fg-muted">{item.preview}</span>}
-                  </span>
-                  <span className="hidden shrink-0 text-xs font-semibold text-fg-muted sm:block">보기 {item.choiceCount}</span>
-                </button>
-              </m.li>
-            );
-          })}
-        </ul>
+        <div className="-mx-1 flex max-h-[min(60vh,640px)] flex-col gap-4 overflow-y-auto p-1 scrollbar-thin">
+          {groupList.length > 0 && (
+            <section aria-label="그룹">
+              <h3 className="mb-2 text-xs font-extrabold text-fg-muted">그룹 · 통째로 추가할 수 있어요</h3>
+              <ul className="flex flex-col gap-2">
+                {groupList.map((g) => (
+                  <BankGroup
+                    key={g.id}
+                    group={g}
+                    filters={filters}
+                    filtering={filtering}
+                    selectedIds={selectedIds}
+                    onToggle={onToggle}
+                    onAddAll={() => onAddGroup(g)}
+                    onRemoveAll={() => onRemoveGroup(g)}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
+          {items.length > 0 && (
+            <section aria-label="그룹 없는 문제">
+              {groupList.length > 0 && <h3 className="mb-2 text-xs font-extrabold text-fg-muted">그룹 없는 문제</h3>}
+              <ul className="flex flex-col gap-2">
+                {items.map((item, i) => (
+                  <BankItem key={item.id} item={item} index={i} on={selectedIds.has(item.id)} onToggle={() => onToggle(brief(item))} />
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       )}
     </div>
   );
@@ -268,12 +420,36 @@ function SelectedPane({ items, onItems }: { items: SelectedItem[]; onItems: (i: 
   );
 }
 
+const newItem = (q: QuestionBrief): SelectedItem => ({ key: itemKey(), questionId: q.id, timeLimitSec: null, multiplier: 1, question: q });
+
 export function QuestionPickerStep({ items, onItems }: { items: SelectedItem[]; onItems: (i: SelectedItem[]) => void }) {
+  const qc = useQueryClient();
   const [tab, setTab] = useState<'bank' | 'selected'>('bank');
   const selectedIds = new Set(items.map((i) => i.questionId));
+  const full = () => toast.warning(`한 퀴즈방에는 문제를 최대 ${MAX_ROOM_ITEMS}개까지 넣을 수 있어요.`);
   const toggle = (q: QuestionBrief) => {
     if (selectedIds.has(q.id)) onItems(items.filter((i) => i.questionId !== q.id));
-    else onItems([...items, { key: itemKey(), questionId: q.id, timeLimitSec: null, multiplier: 1, question: q }]);
+    else if (items.length >= MAX_ROOM_ITEMS) full();
+    else onItems([...items, newItem(q)]);
+  };
+  /** A group goes in as individual questions (a copy of its current order); later group edits don't touch this room. */
+  const addGroup = async (g: QuestionGroupDto) => {
+    try {
+      const data = await qc.fetchQuery({ ...questionListQuery({ groupId: g.id, pageSize: 200 }), staleTime: 0 });
+      const fresh = data.items.filter((it) => !selectedIds.has(it.id));
+      const room = MAX_ROOM_ITEMS - items.length;
+      if (fresh.length > room) full();
+      const added = fresh.slice(0, Math.max(0, room));
+      if (added.length === 0) return;
+      onItems([...items, ...added.map((it) => newItem(brief(it)))]);
+      toast.success(`'${g.name}' 그룹에서 문제 ${added.length}개를 추가했어요.`);
+    } catch (err) {
+      toast.error(errorText(err));
+    }
+  };
+  const removeGroup = (g: QuestionGroupDto) => {
+    const ids = new Set(g.questionIds);
+    onItems(items.filter((i) => !ids.has(i.questionId)));
   };
 
   return (
@@ -309,7 +485,7 @@ export function QuestionPickerStep({ items, onItems }: { items: SelectedItem[]; 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className={cn('rounded-lg bg-surface p-4 shadow-sm ring-1 ring-line/60 md:p-5', tab !== 'bank' && 'hidden lg:block')}>
           <h2 className="mb-3 text-lg font-extrabold">문제은행</h2>
-          <BankPane selectedIds={selectedIds} onToggle={toggle} />
+          <BankPane selectedIds={selectedIds} onToggle={toggle} onAddGroup={addGroup} onRemoveGroup={removeGroup} />
         </section>
         <section className={cn('rounded-lg bg-surface p-4 shadow-sm ring-1 ring-line/60 md:p-5', tab !== 'selected' && 'hidden lg:block')}>
           <div className="mb-3 flex items-baseline justify-between gap-2">
