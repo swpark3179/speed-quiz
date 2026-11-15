@@ -45,6 +45,18 @@ sudo journalctl -u speed-quiz -f        # 로그 (최초 관리자 비밀번호�
 sudo firewall-cmd --add-port=3000/tcp --permanent && sudo firewall-cmd --reload   # 필요 시
 ```
 
+### 80 포트로 서비스하기 (firewalld 리다이렉트)
+
+firewalld로 80 → 3000을 포워딩한다면 참가자는 80으로 접속하므로, 관리화면의 링크·QR도 포트 없는 주소여야 합니다. `.env`에 아래 중 하나를 넣고 서비스를 재시작하세요.
+
+```ini
+PUBLIC_PORT=80                              # IP는 자동 감지, 포트만 80으로 (주소에서 :80 생략)
+# 또는
+PUBLIC_BASE_URL=http://192.168.0.10         # 주소를 직접 고정 (도메인이면 http://quiz.example.com)
+```
+
+> 방은 **확정할 때의 주소**가 저장됩니다. 설정을 바꾸기 전에 확정한 방은 이전 주소(`:3000`)를 그대로 쓰므로, 대기실 단계라면 "확정 취소 → 다시 확정"을 하거나 새 방을 만드세요.
+
 ## 윈도우 서버 (NSSM 서비스)
 
 [NSSM](https://nssm.cc)으로 서비스 등록을 권장합니다(pm2는 윈도우 서비스로 불안정).

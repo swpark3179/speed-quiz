@@ -47,6 +47,7 @@ pnpm loadtest -- --url http://localhost:3000 --password <관리자 비밀번호>
 |---|---|---|
 | `HOST` / `PORT` | `0.0.0.0` / `3000` | 바인딩 주소 |
 | `PUBLIC_BASE_URL` | (자동) | QR·입장 링크에 쓸 주소. 비우면 서버의 LAN IP를 사용 |
+| `PUBLIC_PORT` | (`PORT`와 동일) | QR·입장 링크에 쓸 포트. 80 → 3000 리다이렉트처럼 접속 포트가 다를 때 `80`으로 지정(주소에서 포트 생략). `PUBLIC_BASE_URL`이 있으면 무시 |
 | `DATA_DIR` | `./data` | DB·업로드 이미지·백업 폴더 (네트워크 드라이브 금지) |
 | `COOKIE_SECURE` | `false` | HTTPS로 서비스할 때 `true` (Secure 쿠키, HSTS) |
 | `TRUST_PROXY` | `false` | 리버스 프록시 뒤에서 실행할 때 `true` |
