@@ -32,6 +32,7 @@ export const ERROR_MESSAGES = {
   ROOM_EMPTY: '문제를 한 개 이상 선택해 주세요.',
   ROOM_LIVE: '진행 중인 퀴즈방은 삭제할 수 없어요.',
   QUESTION_INVALID: '문제 구성이 올바르지 않아요.',
+  GROUP_NAME_TAKEN: '이미 같은 이름의 그룹이 있어요.',
   UPLOAD_INVALID: 'PNG, JPG, GIF, WebP 이미지만 올릴 수 있어요.',
   UPLOAD_TOO_LARGE: '이미지 파일이 너무 커요.',
 } as const;
@@ -88,6 +89,7 @@ function defaultStatus(code: ErrorCode): number {
     case 'NICKNAME_TAKEN':
     case 'USERNAME_TAKEN':
     case 'DISPLAY_NAME_TAKEN':
+    case 'GROUP_NAME_TAKEN':
     case 'LAST_MAIN_ADMIN':
     case 'ROOM_FULL':
     case 'NOT_JOINABLE':

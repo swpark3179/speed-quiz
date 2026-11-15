@@ -11,10 +11,12 @@ export const RoomItem = z.object({
 });
 export type RoomItem = z.output<typeof RoomItem>;
 
+export const MAX_ROOM_ITEMS = 100;
+
 export const RoomInput = z.object({
   title: z.string().trim().min(1, '퀴즈방 이름을 입력해 주세요.').max(60),
   settings: RoomSettings,
-  items: z.array(RoomItem).max(100).default([]),
+  items: z.array(RoomItem).max(MAX_ROOM_ITEMS, `문제는 최대 ${MAX_ROOM_ITEMS}개까지 넣을 수 있어요.`).default([]),
 });
 export type RoomInput = z.input<typeof RoomInput>;
 
